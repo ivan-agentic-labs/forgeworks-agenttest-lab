@@ -1,0 +1,20 @@
+{
+  "scope": "exact source commit; no G1-E certification",
+  "application_tests": "32 passed",
+  "slug": "agenttest-lab",
+  "sha": "7569aafb18e4c7f9e6989d9ad6de9e33a0c3f9cf",
+  "runs": [
+    {
+      "id": 37883289820,
+      "name": "G1 Contract Verification",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/37883289820"
+    },
+    {
+      "id": 37883289485,
+      "name": "AgentTest MVP Application CI",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/37883289485"
+    }
+  ]
+}
