@@ -116,6 +116,12 @@ def test_comparison_binds_versions_and_creates_export_artifact(tmp_path):
         assert transferred.status_code == 200
         assert hashlib.sha256(transferred.content).hexdigest() == artifact.json()['sha256']
         assert transferred.headers['cache-control'] == 'no-store'
+        # A previously issued capability must not survive membership revocation.
+        with app.state.store.conn() as db:
+            db.execute("UPDATE memberships SET status='REVOKED' WHERE tenant_id=? AND user_id=?", (TENANT, USER))
+        assert client.get(download.json()['download_url']).status_code == 403
+        with app.state.store.conn() as db:
+            db.execute("UPDATE memberships SET status='ACTIVE' WHERE tenant_id=? AND user_id=?", (TENANT, USER))
         from uuid import uuid4
         assert client.get(download.json()['download_url'].replace(result['artifact_id'],str(uuid4()))).status_code == 403
         with app.state.store.conn() as db:

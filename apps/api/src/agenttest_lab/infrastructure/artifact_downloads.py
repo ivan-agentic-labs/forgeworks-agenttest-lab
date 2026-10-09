@@ -15,15 +15,15 @@ def signing_secret():
     return secret
 
 
-def issue_download(tenant,rid,sha):
+def issue_download(tenant,actor,rid,sha):
     expiry=int(time.time())+300
-    return jwt.encode({'iss':'forgeworks-artifacts','aud':'artifact-download','sub':rid,'tenant_id':tenant,'sha256':sha,'exp':expiry},signing_secret(),algorithm='HS256'),expiry
+    return jwt.encode({'iss':'forgeworks-artifacts','aud':'artifact-download','sub':rid,'tenant_id':tenant,'actor':actor,'sha256':sha,'exp':expiry},signing_secret(),algorithm='HS256'),expiry
 
 
 def verify_download(token,rid):
     if len(token)>4096:fail('INVALID_ARTIFACT_CAPABILITY')
     try:
-        claims=jwt.decode(token,signing_secret(),algorithms=['HS256'],issuer='forgeworks-artifacts',audience='artifact-download',options={'require':['sub','tenant_id','sha256','exp']})
+        claims=jwt.decode(token,signing_secret(),algorithms=['HS256'],issuer='forgeworks-artifacts',audience='artifact-download',options={'require':['sub','tenant_id','actor','sha256','exp']})
         if claims['sub']!=rid:fail('INVALID_ARTIFACT_CAPABILITY')
         return claims
     except jwt.PyJWTError:
