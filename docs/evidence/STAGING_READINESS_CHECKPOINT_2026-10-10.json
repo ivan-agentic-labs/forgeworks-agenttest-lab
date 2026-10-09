@@ -1,0 +1,84 @@
+{
+  "date": "2026-10-10",
+  "environment": "staging",
+  "status": "PARTIAL_NOT_READY_FOR_FULL_PRODUCT_USE",
+  "production_ready": false,
+  "railway_project": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
+  "supabase_project": "fljekuwplgkrpdoajyhn",
+  "verification": {
+    "workflow_yaml_files_parsed": 24,
+    "session_race_tests": {
+      "passed": 15,
+      "total": 15,
+      "scope": "mocked browser DOM and authentication responses; not live owner login"
+    },
+    "application_tests_previous_verified_checkpoint": {
+      "passed": 527,
+      "skipped": 6,
+      "scope": "synthetic local and CI test data"
+    },
+    "owner_live_business_acceptance": "NOT_COMPLETED"
+  },
+  "changes": [
+    "Protect cleared login sessions against delayed refresh and login responses",
+    "Suppress duplicate login submissions",
+    "Run disposable PostgreSQL 17 CI without Docker Hub pulls",
+    "Repair DataReconcile G2 workflow YAML",
+    "Publish product-specific staging quickstart",
+    "Use official Docker Python 3.12 slim mirror on public ECR after Docker Hub 429/504 build failures"
+  ],
+  "remaining": [
+    "Verified owner Supabase Auth account and active product memberships/grants",
+    "GitHub identity verification and dedicated APIShield GitHub App credentials; deployment app is separate",
+    "APIShield completed repository analysis worker flow",
+    "AccessFix isolated browser runner for actual remote scans",
+    "AgentTest actual agent execution remains disabled; live verdict cryptographic verification incomplete",
+    "Live authenticated browser acceptance blocked by staging domain network policy"
+  ],
+  "limits": [
+    "Storage probe proves only synthetic object upload/read/digest/size/delete, not owner business flows",
+    "AccessFix Chromium proof uses disposable fixtures, not a remote customer site",
+    "No production or customer data processed",
+    "No upgrade to paid infrastructure plans"
+  ],
+  "product": "agenttest-lab",
+  "source_commit": "107f67535ef28aa3bab1f64d94f0afe9bd7350cd",
+  "deployment": {
+    "id": "88729861-a0ea-40a7-8339-e6cf44c2de55",
+    "status": "SUCCESS",
+    "updated_at": "2026-10-09T21:29:10.634Z",
+    "service_id": "f2d6c578-ffaf-4682-b81a-8bae13d9c7a3"
+  },
+  "ci": [
+    {
+      "id": 37993596439,
+      "name": "G1 Contract Verification",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/37993596439"
+    },
+    {
+      "id": 37993596281,
+      "name": "AgentTest PostgreSQL Runtime Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/37993596281"
+    },
+    {
+      "id": 37993596267,
+      "name": "AgentTest MVP Application CI",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/37993596267"
+    }
+  ],
+  "storage_probe": {
+    "status": "PASS",
+    "observations": [
+      {
+        "message": "STORAGE_PROBE_PASS: signed upload, persisted read, digest and size verified",
+        "timestamp": "2026-10-09T21:28:57.981931663Z"
+      }
+    ]
+  }
+}
