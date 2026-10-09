@@ -2,8 +2,8 @@ openapi: 3.1.2
 info:
   title: AgentTest Lab API contract design (not deployed)
   version: 0.4.1-design-candidate
-  description: Design candidate v3.4, not deployed. Error object updated to RFC 9457; business acceptance and formal
-    OAS validation pending.
+  description: Design candidate v3.4, not deployed. Error object updated to RFC 9457;
+    business acceptance and formal OAS validation pending.
 servers:
 - url: https://api.example.invalid
   description: Non-functional placeholder; DO NOT deploy or send credentials
@@ -81,7 +81,8 @@ paths:
           type: string
           minLength: 16
           maxLength: 128
-        description: Unique per tenant/principal/action/request body; same key changed body returns 409.
+        description: Unique per tenant/principal/action/request body; same key changed
+          body returns 409.
       requestBody:
         required: true
         content:
@@ -167,7 +168,8 @@ paths:
           type: string
           minLength: 16
           maxLength: 128
-        description: Unique per tenant/principal/action/request body; same key changed body returns 409.
+        description: Unique per tenant/principal/action/request body; same key changed
+          body returns 409.
       requestBody:
         required: true
         content:
@@ -247,7 +249,8 @@ paths:
           type: string
           minLength: 16
           maxLength: 128
-        description: Unique per tenant/principal/action/request body; same key changed body returns 409.
+        description: Unique per tenant/principal/action/request body; same key changed
+          body returns 409.
       requestBody:
         required: true
         content:
@@ -327,7 +330,8 @@ paths:
           type: string
           minLength: 16
           maxLength: 128
-        description: Unique per tenant/principal/action/request body; same key changed body returns 409.
+        description: Unique per tenant/principal/action/request body; same key changed
+          body returns 409.
       requestBody:
         required: true
         content:
@@ -499,7 +503,8 @@ paths:
           type: string
           minLength: 16
           maxLength: 128
-        description: Unique per tenant/principal/action/request body; same key changed body returns 409.
+        description: Unique per tenant/principal/action/request body; same key changed
+          body returns 409.
       requestBody:
         required: true
         content:
@@ -595,55 +600,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/UploadIntent'
         '400':
-          description: 400 – typed error
+          description: "400 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '401':
-          description: 401 – typed error
+          description: "401 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '403':
-          description: 403 – typed error
+          description: "403 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '404':
-          description: 404 – typed error
+          description: "404 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '409':
-          description: 409 – typed error
+          description: "409 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '413':
-          description: 413 – typed error
+          description: "413 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '422':
-          description: 422 – typed error
+          description: "422 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '429':
-          description: 429 – typed error
+          description: "429 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '503':
-          description: 503 – typed error
+          description: "503 \u2013 typed error"
           content:
             application/problem+json:
               schema:
@@ -680,55 +685,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/ArtifactRecord'
         '400':
-          description: 400 – typed error
+          description: "400 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '401':
-          description: 401 – typed error
+          description: "401 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '403':
-          description: 403 – typed error
+          description: "403 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '404':
-          description: 404 – typed error
+          description: "404 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '409':
-          description: 409 – typed error
+          description: "409 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '413':
-          description: 413 – typed error
+          description: "413 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '422':
-          description: 422 – typed error
+          description: "422 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '429':
-          description: 429 – typed error
+          description: "429 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '503':
-          description: 503 – typed error
+          description: "503 \u2013 typed error"
           content:
             application/problem+json:
               schema:
@@ -771,55 +776,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/ArtifactRecord'
         '400':
-          description: 400 – typed error
+          description: "400 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '401':
-          description: 401 – typed error
+          description: "401 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '403':
-          description: 403 – typed error
+          description: "403 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '404':
-          description: 404 – typed error
+          description: "404 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '409':
-          description: 409 – typed error
+          description: "409 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '413':
-          description: 413 – typed error
+          description: "413 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '422':
-          description: 422 – typed error
+          description: "422 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '429':
-          description: 429 – typed error
+          description: "429 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '503':
-          description: 503 – typed error
+          description: "503 \u2013 typed error"
           content:
             application/problem+json:
               schema:
@@ -846,55 +851,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/DownloadIntent'
         '400':
-          description: 400 – typed error
+          description: "400 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '401':
-          description: 401 – typed error
+          description: "401 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '403':
-          description: 403 – typed error
+          description: "403 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '404':
-          description: 404 – typed error
+          description: "404 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '409':
-          description: 409 – typed error
+          description: "409 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '413':
-          description: 413 – typed error
+          description: "413 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '422':
-          description: 422 – typed error
+          description: "422 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '429':
-          description: 429 – typed error
+          description: "429 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '503':
-          description: 503 – typed error
+          description: "503 \u2013 typed error"
           content:
             application/problem+json:
               schema:
@@ -929,55 +934,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/JobStatus'
         '400':
-          description: 400 – typed error
+          description: "400 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '401':
-          description: 401 – typed error
+          description: "401 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '403':
-          description: 403 – typed error
+          description: "403 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '404':
-          description: 404 – typed error
+          description: "404 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '409':
-          description: 409 – typed error
+          description: "409 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '413':
-          description: 413 – typed error
+          description: "413 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '422':
-          description: 422 – typed error
+          description: "422 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '429':
-          description: 429 – typed error
+          description: "429 \u2013 typed error"
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '503':
-          description: 503 – typed error
+          description: "503 \u2013 typed error"
           content:
             application/problem+json:
               schema:
@@ -987,12 +992,69 @@ paths:
         in: path
         required: true
         schema: *id001
+  /v1/artifact-transfers/{artifact_id}:
+    get:
+      operationId: get_artifact_export_bytes
+      summary: Download exact immutable verdict export bytes
+      security:
+      - ArtifactDownloadCapability: []
+      parameters:
+      - name: artifact_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Persisted canonical verdict export
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - binding
+                - paired
+                - missing
+                - delta
+                - verdict
+                properties:
+                  binding:
+                    type: object
+                    additionalProperties: true
+                  paired:
+                    type: integer
+                    minimum: 0
+                  missing:
+                    type: integer
+                    minimum: 0
+                  delta:
+                    type: number
+                  verdict:
+                    type: string
+                    enum:
+                    - PASS
+                    - FAIL
+        '403': &id002
+          description: Capability rejected or artifact bytes unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409': *id002
+        '503': *id002
+      x-required-scope: artifact:download-capability
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    ArtifactDownloadCapability:
+      type: apiKey
+      in: query
+      name: token
+      description: Short-lived artifact/tenant/digest-bound download capability.
   schemas:
     Dataset:
       type: object
@@ -1421,7 +1483,8 @@ components:
           type: boolean
     Problem:
       type: object
-      description: RFC 9457 problem details, with stable application extension code and correlation request_id
+      description: RFC 9457 problem details, with stable application extension code
+        and correlation request_id
       additionalProperties: false
       required:
       - type
@@ -1476,10 +1539,10 @@ components:
         size_bytes:
           type: integer
           minimum: 1
-        sha256: &id002
+        sha256: &id003
           type: string
           pattern: ^[0-9a-f]{64}$
-        declared_media_type: &id003
+        declared_media_type: &id004
           type: string
     UploadIntent:
       type: object
@@ -1499,7 +1562,7 @@ components:
         upload_url:
           type: string
           format: uri
-        expires_at: &id004
+        expires_at: &id005
           type: string
           format: date-time
         required_headers:
@@ -1514,7 +1577,7 @@ components:
       - size_bytes
       - object_generation
       properties:
-        sha256: *id002
+        sha256: *id003
         size_bytes:
           type: integer
           minimum: 1
@@ -1543,12 +1606,12 @@ components:
           - REJECTED
           - EXPIRED
           - DELETED
-        kind: *id003
-        sha256: *id002
+        kind: *id004
+        sha256: *id003
         size_bytes:
           type: integer
           minimum: 0
-        created_at: *id004
+        created_at: *id005
         rejected_reason:
           type:
           - string
@@ -1565,9 +1628,9 @@ components:
         artifact_id: *id001
         download_url:
           type: string
-          format: uri
-        expires_at: *id004
-        object_generation: *id003
+          format: uri-reference
+        expires_at: *id005
+        object_generation: *id004
     JobStatus:
       type: object
       additionalProperties: false
@@ -1580,7 +1643,7 @@ components:
       - attempt_count
       properties:
         id: *id001
-        kind: *id003
+        kind: *id004
         state:
           type: string
           enum:
@@ -1593,7 +1656,7 @@ components:
           - CANCELLED
           - BLOCKED
           - RECONCILIATION_REQUIRED
-        created_at: *id004
+        created_at: *id005
         state_version:
           type: integer
           minimum: 1

@@ -208,6 +208,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/artifact-transfers/{artifact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download exact immutable verdict export bytes */
+        get: operations["get_artifact_export_bytes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -443,7 +460,7 @@ export interface components {
         DownloadIntent: {
             /** Format: uuid */
             artifact_id: string;
-            /** Format: uri */
+            /** Format: uri-reference */
             download_url: string;
             /** Format: date-time */
             expires_at: string;
@@ -1677,6 +1694,64 @@ export interface operations {
                 };
             };
             /** @description 503 – typed error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_artifact_export_bytes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Persisted canonical verdict export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        binding: {
+                            [key: string]: unknown;
+                        };
+                        paired: number;
+                        missing: number;
+                        delta: number;
+                        /** @enum {string} */
+                        verdict: "PASS" | "FAIL";
+                    };
+                };
+            };
+            /** @description Capability rejected or artifact bytes unavailable */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Capability rejected or artifact bytes unavailable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Capability rejected or artifact bytes unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

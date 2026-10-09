@@ -345,7 +345,7 @@ class Store:
             if row["sha256"] != sha256 or int(row["size_bytes"]) != size_bytes:
                 db.execute("UPDATE artifacts SET status='REJECTED', rejected_reason='CHECKSUM_OR_SIZE_MISMATCH' WHERE tenant_id=? AND id=?", (tenant_id, artifact_id))
                 raise StoreError("ARTIFACT_INTEGRITY_MISMATCH", "Committed artifact does not match its upload intent", 409)
-            db.execute("UPDATE artifacts SET status='AVAILABLE', object_generation=? WHERE tenant_id=? AND id=?", (generation, tenant_id, artifact_id))
+            db.execute("UPDATE artifacts SET status='QUARANTINED', object_generation=? WHERE tenant_id=? AND id=?", (generation, tenant_id, artifact_id))
         result = self.artifact(tenant_id, artifact_id)
         assert result is not None
         return result
@@ -362,3 +362,7 @@ class Store:
             raise StoreError("ARTIFACT_NOT_AVAILABLE", "Artifact is not available for download", 409)
         return row
 
+
+    def export(self, tenant_id: str, artifact_id: str):
+        with self.conn() as db:
+            return db.execute("SELECT binding_json,sha256 FROM artifact_exports WHERE tenant_id=? AND artifact_id=?", (tenant_id, artifact_id)).fetchone()

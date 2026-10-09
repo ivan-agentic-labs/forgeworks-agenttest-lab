@@ -111,6 +111,17 @@ def test_comparison_binds_versions_and_creates_export_artifact(tmp_path):
         download = client.post(f"/v1/artifacts/{result['artifact_id']}/download-intents", headers=headers("artifact:download"))
         assert download.status_code == 201
         assert download.json()["object_generation"] == "synthetic-local"
+        import hashlib
+        transferred = client.get(download.json()['download_url'])
+        assert transferred.status_code == 200
+        assert hashlib.sha256(transferred.content).hexdigest() == artifact.json()['sha256']
+        assert transferred.headers['cache-control'] == 'no-store'
+        from uuid import uuid4
+        assert client.get(download.json()['download_url'].replace(result['artifact_id'],str(uuid4()))).status_code == 403
+        with app.state.store.conn() as db:
+            db.execute('UPDATE artifact_exports SET binding_json=? WHERE artifact_id=?',('{}',result['artifact_id']))
+        assert client.get(download.json()['download_url']).status_code == 409
+
         self_compare = client.post(
             f"/v1/evaluation-runs/{candidate['id']}/comparisons",
             headers=headers("evaluation:compare"),
@@ -118,3 +129,14 @@ def test_comparison_binds_versions_and_creates_export_artifact(tmp_path):
         )
         assert self_compare.status_code == 409
         assert self_compare.json()["code"] == "INVALID_COMPARISON_BINDING"
+
+
+
+def test_unverified_external_artifacts_remain_quarantined(tmp_path):
+    with TestClient(create_app(str(tmp_path/'db.sqlite'),seed=True)) as client:
+        created=client.post('/v1/artifacts/upload-intents',headers=headers('artifact:create'),json={'kind':'dataset','filename':'synthetic.json','size_bytes':2,'sha256':'a'*64})
+        assert created.status_code==201
+        aid=created.json()['artifact_id']
+        committed=client.post(f'/v1/artifacts/{aid}/commit',headers=headers('artifact:commit'),json={'size_bytes':2,'sha256':'a'*64,'object_generation':'declared-not-verified'})
+        assert committed.status_code==200 and committed.json()['status']=='QUARANTINED'
+        assert client.post(f'/v1/artifacts/{aid}/download-intents',headers=headers('artifact:download')).status_code==409

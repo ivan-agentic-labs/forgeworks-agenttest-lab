@@ -2,6 +2,7 @@ from __future__ import annotations
 from agenttest_lab.presentation.authentication import decode_bearer
 
 import os
+import hashlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any
@@ -9,7 +10,7 @@ from uuid import UUID
 
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -221,7 +222,25 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             row = store.download_intent(c["tenant_id"], str(artifact_id))
         except StoreError as error:
             handle_store_error(error)
-        return {"artifact_id": row["id"], "download_url": f"https://storage.invalid/download/{row['id']}", "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat().replace("+00:00", "Z"), "object_generation": row["object_generation"]}
+        export = store.export(c["tenant_id"], str(artifact_id))
+        if not export:
+            reject(409, "ARTIFACT_BYTES_UNAVAILABLE", "Persisted export bytes are unavailable")
+        from agenttest_lab.infrastructure.artifact_downloads import issue_download
+        token, expiry = issue_download(c["tenant_id"], str(artifact_id), row["sha256"])
+        return {"artifact_id": row["id"], "download_url": f"/v1/artifact-transfers/{row['id']}?token={token}", "expires_at": datetime.fromtimestamp(expiry,timezone.utc).isoformat().replace("+00:00", "Z"), "object_generation": row["object_generation"]}
+
+    @app.get("/v1/artifact-transfers/{artifact_id}")
+    def transfer_artifact(artifact_id: UUID, token: str):
+        from agenttest_lab.infrastructure.artifact_downloads import verify_download
+        claims = verify_download(token, str(artifact_id))
+        export = store.export(claims["tenant_id"], str(artifact_id))
+        artifact = store.artifact(claims["tenant_id"], str(artifact_id))
+        if not export or not artifact or artifact["status"] != "AVAILABLE":
+            reject(409, "ARTIFACT_BYTES_UNAVAILABLE", "Persisted export bytes are unavailable")
+        body = export["binding_json"].encode('utf-8')
+        if hashlib.sha256(body).hexdigest() != claims["sha256"] or export["sha256"] != claims["sha256"] or artifact["sha256"] != claims["sha256"]:
+            reject(409, "ARTIFACT_INTEGRITY_FAILURE", "Persisted export bytes do not match the signed digest")
+        return Response(body,media_type='application/json',headers={'Content-Disposition':'attachment','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'})
 
     @app.get("/v1/jobs/{jid}")
     def job(jid: UUID, c=Depends(scope("job:read", store))):

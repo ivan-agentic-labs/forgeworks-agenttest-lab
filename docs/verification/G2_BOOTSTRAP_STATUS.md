@@ -1,10 +1,9 @@
-# G2 bootstrap status — 9 October 2026
+# G2 bootstrap status — 2026-10-09
 
-Owner: `ivan-agentic-labs`. Five independent private repositories are authorized.
-G1 owner design approval permits bootstrap; historical conditional review text remains baseline evidence. The current evidence is partial only; G1-E remains OPEN/BLOCKED until all required runtime evidence and approvals are accepted.
+Owner: `ivan-agentic-labs`. Repository bootstrap and scoped engineering verification are complete for the tested source receipt. Engineering now proceeds directly on main under the latest owner authorization. The repository remains private and independent.
 
-On audited SHA `1de45357101caa63e7c21c03dbb0876e35cb7755`, independent OpenAPI and static contract/event checks passed locally and in [G1 Contract Verification run 37877966196](https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/37877966196). Application pytest/static checks passed in [Application CI run 37877966215](https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/37877966215). Empty disposable PostgreSQL DDL and the separate non-owner two-tenant RLS negative proof passed in [run 37877994536](https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/37877994536). These are narrow static/synthetic proofs; generated-client compilation, real identity, browser sandbox/egress, external storage, and production operations evidence remain NOT_RUN or BLOCKED.
+Current evidence and exact commit/run links: [CURRENT_GATE_EVIDENCE.md](CURRENT_GATE_EVIDENCE.md) and [main source receipt](../evidence/MAIN_VERIFICATION_2026-10-09.json). Historical receipts retain their original scope.
 
-APIShield is the first implementation priority AFTER remote bootstrap and CI verification. No production deployment or customer data is authorized.
+Contracts/client compilation, complete application tests, implemented PostgreSQL MVP runtime with negative RLS/concurrency checks and disposable logical restore have passed. These are scoped results; G1-E remains OPEN/BLOCKED. Real identities/BFF, external storage/source ingestion, sandbox/provider/product GitHub App effects, PITR/load/regional recovery and independent acceptance remain unfinished or blocked. No production deployment or customer data is used.
 
-The PostgreSQL workflow uses an intentionally public, disposable localhost-only test password. This is not a production credential. Never reuse it outside the isolated test service.
+CI database credentials are intentionally synthetic and confined to fresh disposable localhost services.

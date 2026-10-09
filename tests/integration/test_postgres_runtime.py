@@ -7,7 +7,7 @@ import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict,make_conninfo
 from agenttest_lab.infrastructure.store import TENANT,USER,StoreError
-from agenttest_lab.infrastructure.postgres_store import PostgresStore
+from agenttest_lab.infrastructure.postgres_store import PostgresStore, ROLE
 
 
 def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(monkeypatch):
@@ -28,15 +28,17 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
     with pytest.raises(ValueError,match='superuser'):PostgresStore(owner)
     store=PostgresStore(runtime)
     assert not store.member(TENANT, "unmapped-oidc-subject")
-    # Even ownership of a different product table is forbidden to runtime login/group.
-    with psycopg.connect(owner) as db:
-        db.execute('ALTER TABLE memberships OWNER TO fw_runtime_test')
-    try:
-        with pytest.raises(ValueError,match='own product tables'):
-            PostgresStore(runtime)
-    finally:
+    # Runtime login and its group cannot own tenant/provisioning tables either.
+    for table, new_owner in [('memberships','fw_runtime_test'),('tenants',ROLE)]:
         with psycopg.connect(owner) as db:
-            db.execute('ALTER TABLE memberships OWNER TO postgres')
+            db.execute(psycopg.sql.SQL('ALTER TABLE {} OWNER TO {}').format(psycopg.sql.Identifier(table),psycopg.sql.Identifier(new_owner)))
+        try:
+            with pytest.raises(ValueError,match='own product tables'):
+                PostgresStore(runtime)
+        finally:
+            with psycopg.connect(owner) as db:
+                db.execute(psycopg.sql.SQL('ALTER TABLE {} OWNER TO postgres').format(psycopg.sql.Identifier(table)))
+                db.execute(psycopg.sql.SQL('REVOKE ALL ON {} FROM {}').format(psycopg.sql.Identifier(table),psycopg.sql.Identifier(new_owner)))
 
     assert store.member(TENANT,USER) and not store.member(other,USER)
     dataset=store.dataset(TENANT,'Synthetic corpus',USER)
@@ -77,3 +79,9 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
         key=load_pem_private_key(os.environ['CI_VERDICT_SIGNING_KEY_PEM'].encode(),password=None)
         key.public_key().verify(base64.urlsafe_b64decode(data['signature']),body)
+
+        comparison = store.comparison(TENANT,ids[0])
+        intent = client.post(f"/v1/artifacts/{comparison['artifact_id']}/download-intents",headers=h('artifact:download'))
+        assert intent.status_code==201,intent.text
+        transferred=client.get(intent.json()['download_url'])
+        assert transferred.status_code==200 and hashlib.sha256(transferred.content).hexdigest()==comparison['artifact_sha']
