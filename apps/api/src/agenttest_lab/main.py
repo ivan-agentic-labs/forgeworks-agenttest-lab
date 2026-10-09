@@ -205,11 +205,15 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @app.post("/v1/artifacts/upload-intents", status_code=201)
     def upload_intent(body: UploadIntentRequest, c=Depends(scope("artifact:create", store))):
+        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+            reject(503, "EXTERNAL_STORAGE_REQUIRED", "An external artifact upload backend is required")
         row = store.artifact_intent(c["tenant_id"], body.kind, body.filename, body.size_bytes, body.sha256, body.declared_media_type)
         return {"artifact_id": row["id"], "status": row["status"], "upload_url": f"https://storage.invalid/upload/{row['id']}", "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat().replace("+00:00", "Z"), "required_headers": {"x-artifact-sha256": row["sha256"]}}
 
     @app.post("/v1/artifacts/{artifact_id}/commit", status_code=200)
     def commit_artifact(artifact_id: UUID, body: CommitUploadRequest, c=Depends(scope("artifact:commit", store))):
+        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+            reject(503, "EXTERNAL_STORAGE_REQUIRED", "An external artifact upload backend is required")
         try:
             row = store.artifact_commit(c["tenant_id"], str(artifact_id), body.sha256, body.size_bytes, body.object_generation)
         except StoreError as error:
