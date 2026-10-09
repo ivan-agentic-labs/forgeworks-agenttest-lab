@@ -16,6 +16,7 @@ def parse_dataset(source: str, expected_sha: str, expected_count: int) -> list[d
     def unique(pairs):
         result = {}
         for key, value in pairs:
+            key.encode("utf-8", errors="strict")
             if key in result:
                 raise ValueError("DATASET_DUPLICATE_JSON_KEY")
             result[key] = value
@@ -50,5 +51,7 @@ def parse_dataset(source: str, expected_sha: str, expected_count: int) -> list[d
                 pending.extend((item, depth + 1) for item in value)
             elif isinstance(value, float) and not math.isfinite(value):
                 raise ValueError("DATASET_NONFINITE_NUMBER")
+            elif isinstance(value, str) and any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+                raise ValueError("DATASET_INVALID_UNICODE")
         cases.append(case)
     return cases

@@ -41,3 +41,9 @@ def test_repeated_case_keys_and_claimed_count_rejected():
     line='{"case_key":"a","input":1,"expected":2}\n'
     with pytest.raises(ValueError):parse_dataset(line*2,digest(line*2),2)
     with pytest.raises(ValueError):parse_dataset(line,digest(line),2)
+
+
+def test_escaped_unpaired_surrogate_rejected_before_persistence():
+    source='{"case_key":"a","input":"\\ud800","expected":2}\n'
+    with pytest.raises(ValueError,match="DATASET_INVALID_UNICODE"):
+        parse_dataset(source,digest(source),1)
