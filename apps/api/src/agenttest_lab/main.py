@@ -139,6 +139,11 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     async def errors(_, error: HTTPException):
         return JSONResponse(status_code=error.status_code, content=error.detail if isinstance(error.detail, dict) else {"type": "about:blank", "title": "Request rejected", "status": error.status_code, "code": "REQUEST_REJECTED", "detail": str(error.detail), "request_id": "runtime"})
 
+    @app.get("/v1/auth/config")
+    def auth_config():
+        key=os.getenv("SUPABASE_PUBLISHABLE_KEY","")
+        return {"enabled":os.getenv("AUTH_MODE")=="supabase" and key.startswith("sb_publishable_"), "supabase_url":os.getenv("SUPABASE_URL",""), "publishable_key":key if key.startswith("sb_publishable_") else "", "product":"agenttest-lab", "environment":os.getenv("APP_ENV","development")}
+
     @app.get("/readyz")
     def ready():
         from agenttest_lab.presentation.authentication import readiness
@@ -341,6 +346,11 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     web_dir = ROOT / "apps" / "web"
     if web_dir.is_dir():
         app.mount("/ui", StaticFiles(directory=str(web_dir), html=True), name="web-console")
+
+    @app.get("/", include_in_schema=False)
+    def home():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/ui/",status_code=307)
 
     return app
 

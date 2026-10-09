@@ -64,7 +64,7 @@
 
   function caseResults(statuses) {
     return statuses.map((status, index) => ({
-      case_key: `case-${index + 1}`,
+      case_key: window.forgeUploadedArtifact?.caseKeys?.[index] || `case-${index + 1}`,
       status,
       ...(status === "PASS" ? { score: 1 } : status === "FAIL" ? { score: 0 } : {})
     }));
@@ -144,9 +144,12 @@
       const candidateStatuses = parseStatuses($("candidate-statuses").value, "Candidate statuses");
       const threshold = Number($("threshold").value);
       if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) throw new Error("Threshold must be between 0 and 1.");
+      const uploaded = window.forgeUploadedArtifact;
+      if (window.forgeAuthConfig?.environment === "staging" && !uploaded) throw new Error("Unggah dataset JSONL terlebih dahulu.");
+      if (uploaded && (baselineStatuses.length !== uploaded.caseKeys.length || candidateStatuses.length !== uploaded.caseKeys.length)) throw new Error("Jumlah hasil baseline dan kandidat harus sama dengan jumlah kasus dataset.");
       const dataset = await request("/v1/datasets", { method: "POST", body: JSON.stringify({ name: $("dataset-name").value.trim() }) });
       assertResponseFields(dataset, ["id"], "Dataset response");
-      const version = await request(`/v1/datasets/${dataset.id}/versions`, { method: "POST", body: JSON.stringify({ artifact_id: $("artifact-id").value.trim(), sha256: sha("a"), case_count: Math.max(baselineStatuses.length, candidateStatuses.length) }) });
+      const version = await request(`/v1/datasets/${dataset.id}/versions`, { method: "POST", body: JSON.stringify({ artifact_id: $("artifact-id").value.trim(), sha256: uploaded?.sha256 || sha("a"), case_count: uploaded?.caseKeys.length || Math.max(baselineStatuses.length, candidateStatuses.length) }) });
       assertResponseFields(version, ["id"], "Dataset version response");
       const build = await request("/v1/agent-builds", { method: "POST", body: JSON.stringify({ name: $("build-name").value.trim(), build_sha256: sha("b"), tool_manifest_sha256: sha("c"), prompt_version: "web-console-v1" }) });
       assertResponseFields(build, ["id"], "Build response");
