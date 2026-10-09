@@ -121,6 +121,8 @@ class Store:
         return dataset_id
 
     def version(self, tenant_id: str, dataset_id: str, sha256: str, case_count: int, artifact_id: str | None = None) -> str:
+        if isinstance(case_count, bool) or not isinstance(case_count, int) or not 1 <= case_count <= 1000:
+            raise StoreError("DATASET_BUDGET_EXCEEDED", "Dataset versions require 1 to 1000 cases")
         version_id = str(uuid.uuid4())
         with self.conn() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -157,6 +159,13 @@ class Store:
         idempotency_key: str | None = None,
     ) -> sqlite3.Row:
         supplied = list(results) if results is not None else []
+        if len(supplied) > 1000:
+            raise StoreError("EVALUATION_BUDGET_EXCEEDED", "At most 1000 case results are accepted")
+        keys = [item.get("case_key") if isinstance(item, dict) else None for item in supplied]
+        if any(not isinstance(key, str) or not key or len(key) > 128 for key in keys):
+            raise StoreError("INVALID_CASE_BINDING", "Each result requires a bounded string case key")
+        if len(set(keys)) != len(keys):
+            raise StoreError("DUPLICATE_CASE_RESULT", "Duplicate case results cannot overwrite evaluation evidence")
         fingerprint = digest({
             "version_id": version_id,
             "build_id": build_id,
@@ -188,6 +197,8 @@ class Store:
             seed = config.get("seed")
             if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
                 raise StoreError("INVALID_GRADER_CONFIGURATION", "seed must be an integer")
+            if seed is not None and not -(2**63) <= seed <= 2**63-1:
+                raise StoreError("INVALID_GRADER_CONFIGURATION", "seed must fit a signed 64-bit integer")
             seed_source = str(config.get("seed_source", "request" if seed is not None else "deterministic-default"))
             config["threshold"] = threshold
             config["seed"] = seed
@@ -202,6 +213,11 @@ class Store:
                 run_id, job_id = str(uuid.uuid4()), str(uuid.uuid4())
             created = now()
             expected = int(version["case_count"])
+            if not 1 <= expected <= 1000:
+                raise StoreError("EVALUATION_BUDGET_EXCEEDED", "Stored dataset exceeds the evaluation case budget")
+            expected_keys = {f"case-{i}" for i in range(1, expected + 1)}
+            if any(key not in expected_keys for key in keys):
+                raise StoreError("UNKNOWN_CASE_RESULT", "Result key is not part of this dataset version's positional case set")
             if not supplied:
                 if os.getenv("AGENTTEST_SYNTHETIC_MODE") != "1" or os.getenv("APP_ENV") not in {"development", "test"}:
                     raise StoreError("AGENT_EXECUTION_DISABLED", "Supply actual case results; synthetic evaluation requires explicit development/test opt-in", 503)

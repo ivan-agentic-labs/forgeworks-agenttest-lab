@@ -28,7 +28,7 @@ class Version(BaseModel):
     model_config = ConfigDict(extra="forbid")
     artifact_id: UUID
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    case_count: int = Field(ge=1)
+    case_count: int = Field(ge=1, le=1000, strict=True)
 
 
 class Build(BaseModel):
@@ -41,7 +41,7 @@ class Build(BaseModel):
 
 class CaseResultInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    case_key: str = Field(min_length=1)
+    case_key: str = Field(min_length=1, max_length=128)
     status: str = "PASS"
     score: float | None = None
     trace_jsonl: str | None = None
@@ -51,7 +51,7 @@ class CaseResultInput(BaseModel):
 class GraderConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
     threshold: float = Field(default=0.0, ge=0.0, le=1.0)
-    seed: int | None = None
+    seed: int | None = Field(default=None, ge=-(2**63), le=2**63-1, strict=True)
     seed_source: str | None = Field(default=None, min_length=1)
 
 
@@ -62,8 +62,8 @@ class Run(BaseModel):
     grader_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     grader_config: GraderConfig | None = None
     threshold: float | None = Field(default=None, ge=0.0, le=1.0)
-    seed: int | None = None
-    case_results: list[CaseResultInput] | None = None
+    seed: int | None = Field(default=None, ge=-(2**63), le=2**63-1, strict=True)
+    case_results: list[CaseResultInput] | None = Field(default=None, max_length=1000)
 
 
 class Compare(BaseModel):

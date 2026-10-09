@@ -34,6 +34,10 @@ Persist supplied case results, compare immutable bindings, sign Ed25519 verdicts
 
 ## Remaining dependency and implementation register
 
+### Evaluation evidence continuation, 2026-10-09
+
+Duplicate case keys now fail instead of silently overwriting evidence; unknown keys fail instead of being ignored. Current metadata-only versions still define positional `case-1` through `case-N` keys, not verified uploaded datasets. Missing expected results remain PARTIAL with null scores. Dataset/run budgets are 1000 cases, keys are bounded to 128 characters, and seeds must fit signed 64-bit PostgreSQL storage. Regression tests verify typed failures and no persisted run on invalid case binding. Actual dataset-byte ingestion and provider execution remain unfinished.
+
 1. Configure a real IdP and provisioned internal identities; finish BFF/session/CSRF/revocation and test them. This includes unfinished code, not only credentials.
 2. Configure external private storage/scanning/retention/deletion and implement remaining source/dataset/upload adapters; do not treat placeholder metadata or quarantined objects as verified bytes.
 3. Supply an isolated runner/network policy and product GitHub App configuration; implement and prove sandbox, webhook/revocation and approval-bound remote effects before enabling them.
