@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.invalid/agenttest-lab/events/v1.schema.json",
+  "title": "AgentTest Lab candidate typed domain events v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_type",
+        "event_version",
+        "tenant_id",
+        "aggregate_id",
+        "aggregate_version",
+        "occurred_at",
+        "correlation_id",
+        "payload"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_type": {
+          "const": "dataset.version_validated"
+        },
+        "event_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlation_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "causation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dataset_id",
+            "dataset_version_id",
+            "dataset_sha256",
+            "case_count",
+            "schema_version"
+          ],
+          "properties": {
+            "dataset_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "dataset_version_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "dataset_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "case_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "schema_version": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_type",
+        "event_version",
+        "tenant_id",
+        "aggregate_id",
+        "aggregate_version",
+        "occurred_at",
+        "correlation_id",
+        "payload"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_type": {
+          "const": "evaluation.completed"
+        },
+        "event_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlation_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "causation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evaluation_run_id",
+            "dataset_version_id",
+            "agent_build_sha256",
+            "grader_sha256",
+            "case_total",
+            "case_passed",
+            "case_missing"
+          ],
+          "properties": {
+            "evaluation_run_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "dataset_version_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "agent_build_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "grader_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "case_total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "case_passed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "case_missing": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_type",
+        "event_version",
+        "tenant_id",
+        "aggregate_id",
+        "aggregate_version",
+        "occurred_at",
+        "correlation_id",
+        "payload"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_type": {
+          "const": "comparison.verdict_issued"
+        },
+        "event_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregate_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlation_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "causation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "comparison_id",
+            "baseline_run_id",
+            "candidate_run_id",
+            "deterministic_verdict",
+            "missing_case_count"
+          ],
+          "properties": {
+            "comparison_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "baseline_run_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "candidate_run_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "deterministic_verdict": {
+              "type": "string",
+              "enum": [
+                "PASS",
+                "FAIL",
+                "BLOCKED"
+              ]
+            },
+            "missing_case_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  ]
+}

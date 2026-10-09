@@ -1,0 +1,32 @@
+[
+  {
+    "child": "grader_results",
+    "column": "case_result_id",
+    "parent": "case_results",
+    "structural": "passed structural candidate checks"
+  },
+  {
+    "child": "test_cases",
+    "column": "dataset_version_id",
+    "parent": "dataset_versions",
+    "structural": "passed structural candidate checks"
+  },
+  {
+    "child": "test_cases",
+    "column": "input_artifact_id",
+    "parent": "artifact_references",
+    "structural": "passed structural candidate checks"
+  },
+  {
+    "child": "trace_imports",
+    "column": "dataset_version_id",
+    "parent": "dataset_versions",
+    "structural": "passed structural candidate checks"
+  },
+  {
+    "child": "trace_imports",
+    "column": "artifact_id",
+    "parent": "artifact_references",
+    "structural": "passed structural candidate checks"
+  }
+]
