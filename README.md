@@ -14,6 +14,8 @@ python -W error -m pytest tests/integration
 ```
 The SQLite store and development issuer are test-only. See `docs/evidence/MVP_CHECKPOINT.md`.
 
+The static evaluation console is served at `/ui/` by the API. It calls only deterministic dataset/build/run/comparison/verdict APIs and keeps bearer tokens in memory.
+
 ## Documents
 - Product scope: `docs/product/PRODUCT_SCOPE.md`
 - Architecture and file ownership: `docs/architecture/`
@@ -30,7 +32,7 @@ python scripts/verify_contracts.py
 python scripts/validate_openapi_independent.py
 ```
 
-CI contains a manual PostgreSQL disposable DDL smoke test. **No live RLS/two-tenant proof or sandbox evidence is claimed.**
+CI contains a manual PostgreSQL disposable DDL smoke test followed by a runtime two-tenant RLS negative test using the non-owner application role. The test is still disposable evidence, not production authorization or sandbox evidence.
 
 ## Non-goals at this stage
 No production deployment, customer data, code-execution agent, public access, financial mutation, license assertion or fake passing tests.

@@ -34,3 +34,5 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
       - name: Execute DDL candidate on empty disposable database
         run: bash scripts/probe_disposable_postgres.sh
+      - name: Execute application-role RLS tenant-isolation negative test
+        run: bash scripts/test_disposable_postgres_rls.sh

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AgentTest Lab | Deterministic Evaluation Console</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">AGENTTEST LAB / READ-ONLY CONTROL PLANE</p>
+        <h1>Deterministic evaluation console</h1>
+        <p class="lede">Register immutable evaluation inputs, run the deterministic grader, compare runs, and inspect the signed CI verdict. This console never executes an agent.</p>
+      </header>
+
+      <section class="card setup" aria-labelledby="setup-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">01 / CONNECTION</p>
+            <h2 id="setup-title">API context</h2>
+          </div>
+          <span class="pill neutral">No arbitrary execution</span>
+        </div>
+        <div class="form-grid">
+          <label>API base URL
+            <input id="api-base" type="url" value="" placeholder="Same origin (or https://api.example.test)">
+          </label>
+          <label>Bearer token
+            <input id="token" type="password" autocomplete="off" placeholder="Paste a scoped token; never stored">
+          </label>
+          <label>Dataset name
+            <input id="dataset-name" value="golden-fixture" minlength="1">
+          </label>
+          <label>Dataset artifact UUID
+            <input id="artifact-id" value="33333333-3333-3333-3333-333333333333" spellcheck="false">
+          </label>
+          <label>Case count
+            <input id="case-count" type="number" min="1" value="1">
+          </label>
+          <label>Build name
+            <input id="build-name" value="candidate-fixture" minlength="1">
+          </label>
+        </div>
+        <p class="help">The token is used only for the current page session. POST calls include an idempotency key as required by the contract.</p>
+      </section>
+
+      <section class="card evaluation" aria-labelledby="evaluation-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">02 / EVALUATION</p>
+            <h2 id="evaluation-title">Create and compare deterministic runs</h2>
+          </div>
+          <button id="run-flow" class="primary" type="button">Run evaluation flow</button>
+        </div>
+        <div class="form-grid two-column">
+          <label>Baseline case statuses
+            <input id="baseline-statuses" value="PASS" spellcheck="false">
+            <span class="field-note">Comma-separated: PASS, FAIL, MISSING, TIMEOUT, INVALID_RESULT</span>
+          </label>
+          <label>Candidate case statuses
+            <input id="candidate-statuses" value="PASS" spellcheck="false">
+            <span class="field-note">Any missing, timeout, or invalid result must fail closed.</span>
+          </label>
+          <label>Threshold
+            <input id="threshold" type="number" min="0" max="1" step="0.01" value="0.2">
+          </label>
+          <label>Policy version
+            <input id="policy-version" value="deterministic-v2" minlength="1">
+          </label>
+        </div>
+        <div class="callout warning">
+          <strong>Fail-closed policy:</strong> incomplete case coverage and terminal statuses (<code>MISSING</code>, <code>TIMEOUT</code>, <code>INVALID_RESULT</code>) are never rendered as a passing verdict, even if a score is available.
+        </div>
+      </section>
+
+      <section class="card verdict-card" aria-labelledby="verdict-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">03 / DECISION</p>
+            <h2 id="verdict-title">CI verdict</h2>
+          </div>
+          <span id="verdict-pill" class="pill neutral">NOT RUN</span>
+        </div>
+        <div id="verdict-summary" class="verdict-summary">Run the flow to create a comparison and retrieve its signed verdict.</div>
+        <dl id="binding" class="binding" hidden></dl>
+      </section>
+
+      <section class="card evidence" aria-labelledby="evidence-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">04 / EVIDENCE</p>
+            <h2 id="evidence-title">Run and API evidence</h2>
+          </div>
+          <button id="clear-log" class="secondary" type="button">Clear</button>
+        </div>
+        <div id="case-results" class="case-results" aria-live="polite"></div>
+        <pre id="log" class="log" aria-live="polite">Waiting for an evaluation flow.</pre>
+      </section>
+    </main>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

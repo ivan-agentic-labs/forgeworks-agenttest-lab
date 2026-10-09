@@ -9,6 +9,7 @@ from uuid import UUID
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from agenttest_lab.infrastructure.store import Store, StoreError
@@ -225,6 +226,10 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         if not row:
             reject(404, "RESOURCE_NOT_FOUND", "Job is not visible")
         return {"id": row["job_id"], "kind": "evaluation", "state": "SUCCEEDED" if row["status"] == "SUCCEEDED" else "FAILED_TERMINAL" if row["status"] == "PARTIAL" else row["status"], "created_at": row["created_at"], "state_version": 1, "attempt_count": 1, "last_error_code": None if row["status"] == "SUCCEEDED" else "INCOMPLETE_RESULTS"}
+
+    web_dir = ROOT / "apps" / "web"
+    if web_dir.is_dir():
+        app.mount("/ui", StaticFiles(directory=str(web_dir), html=True), name="web-console")
 
     return app
 

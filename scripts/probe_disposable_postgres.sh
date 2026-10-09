@@ -11,4 +11,4 @@ for f in 00_role_candidate.sql 10_schema_candidate.sql 20_grants_candidate.sql; 
   psql -X -v ON_ERROR_STOP=1 -f "$base/$f"
 done
 psql -X -v ON_ERROR_STOP=1 -c 'SELECT COUNT(*) AS user_tables FROM pg_tables WHERE schemaname = current_schema();'
-echo 'NOTE: DDL smoke test only. RLS two-tenant isolation, concurrency, FK candidates and permissions require separate evidence.'
+echo 'NOTE: DDL smoke test complete; scripts/test_disposable_postgres_rls.sh provides the separate runtime RLS/two-tenant negative proof.'
