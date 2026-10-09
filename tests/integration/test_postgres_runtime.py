@@ -27,6 +27,7 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
     info.update(user='fw_runtime_test',password='synthetic-local-runtime-test-only');runtime=make_conninfo(**info)
     with pytest.raises(ValueError,match='superuser'):PostgresStore(owner)
     store=PostgresStore(runtime)
+    assert not store.member(TENANT, "unmapped-oidc-subject")
     assert store.member(TENANT,USER) and not store.member(other,USER)
     dataset=store.dataset(TENANT,'Synthetic corpus',USER)
     peers=[PostgresStore(runtime),PostgresStore(runtime)]
