@@ -1,10 +1,18 @@
 # AgentTest Lab
 
-**Status: GitHub G2 bootstrap candidate. Not implemented, not deployed, not production-ready.**
+**Status: synthetic MVP milestone implemented and tested locally. Not deployed, not production-ready, and G1-E remains open.**
 
 Reproducible agent evaluations, regression reports and trace inspection.
 
-This private repository contains the canonical G1 design and executable **verification scaffolding**, not functioning AI product code.
+The first executable slice registers immutable dataset/build versions, runs a deterministic grader over synthetic redacted traces, compares baseline/candidate runs, and produces a policy-bound CI verdict. Arbitrary remote agent execution and LLM judging remain disabled.
+
+## MVP run and test
+```bash
+python -m pip install -e 'apps/api[test]'
+AGENTTEST_SEED_FIXTURE=1 PYTHONPATH=apps/api/src uvicorn agenttest_lab.main:app --reload
+python -W error -m pytest tests/integration
+```
+The SQLite store and development issuer are test-only. See `docs/evidence/MVP_CHECKPOINT.md`.
 
 ## Documents
 - Product scope: `docs/product/PRODUCT_SCOPE.md`
