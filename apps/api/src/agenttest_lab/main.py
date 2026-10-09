@@ -177,9 +177,9 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         return {"items": items, "next_cursor": None, "has_more": False}
 
     @app.post("/v1/evaluation-runs/{rid}/comparisons", status_code=201)
-    def compare(rid: UUID, body: Compare, c=Depends(scope("evaluation:compare", store))):
+    def compare(rid: UUID, body: Compare, c=Depends(scope("evaluation:compare", store)), idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None):
         try:
-            row = store.compare(c["tenant_id"], str(rid), str(body.baseline_run_id), body.policy_version, body.threshold)
+            row = store.compare(c["tenant_id"], str(rid), str(body.baseline_run_id), body.policy_version, body.threshold, idempotency_key=idempotency_key)
         except StoreError as error:
             handle_store_error(error)
         return {"id": row["id"], "status": "COMPUTED", "created_at": row["created_at"], "baseline_run_id": row["baseline_id"], "candidate_run_id": row["candidate_id"], "paired_case_count": row["paired"], "missing_case_count": row["missing"], "delta_score": row["delta"], "policy_version": row["policy"], "threshold": row["threshold"], "artifact_id": row["artifact_id"], "binding": {"dataset_version_id": row["baseline_version_id"], "baseline_build_id": row["baseline_build_id"], "candidate_build_id": row["candidate_build_id"], "baseline_grader_sha256": row["baseline_grader_sha"], "candidate_grader_sha256": row["candidate_grader_sha"], "baseline_grader_config_sha256": row["baseline_config_sha"], "candidate_grader_config_sha256": row["candidate_config_sha"]}}

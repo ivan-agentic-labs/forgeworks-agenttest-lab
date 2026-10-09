@@ -102,6 +102,25 @@ def test_comparison_binds_versions_and_creates_export_artifact(tmp_path):
             json={"baseline_run_id": baseline["id"], "policy_version": "deterministic-v2"},
         )
         assert comparison.status_code == 201
+        replay = client.post(
+            f"/v1/evaluation-runs/{candidate['id']}/comparisons",
+            headers={**headers("evaluation:compare"), "Idempotency-Key": "comparison-replay-001"},
+            json={"baseline_run_id": baseline["id"], "policy_version": "deterministic-v2"},
+        )
+        replay_again = client.post(
+            f"/v1/evaluation-runs/{candidate['id']}/comparisons",
+            headers={**headers("evaluation:compare"), "Idempotency-Key": "comparison-replay-001"},
+            json={"baseline_run_id": baseline["id"], "policy_version": "deterministic-v2"},
+        )
+        assert replay.status_code == replay_again.status_code == 201
+        assert replay.json() == replay_again.json()
+        conflict = client.post(
+            f"/v1/evaluation-runs/{candidate['id']}/comparisons",
+            headers={**headers("evaluation:compare"), "Idempotency-Key": "comparison-replay-001"},
+            json={"baseline_run_id": baseline["id"], "policy_version": "different-policy"},
+        )
+        assert conflict.status_code == 409
+        assert conflict.json()["code"] == "IDEMPOTENCY_KEY_REUSED"
         result = comparison.json()
         assert result["artifact_id"]
         assert result["binding"]["dataset_version_id"] == version_id

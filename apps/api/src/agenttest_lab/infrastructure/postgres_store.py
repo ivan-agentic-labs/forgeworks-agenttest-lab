@@ -146,10 +146,10 @@ class PostgresStore(Store):
     def seed(self):
         raise ValueError("PostgreSQL provisioning requires a separate migration/provisioning role")
     @tenant_method
-    def compare(self, tenant, candidate_id, baseline_id, policy, threshold=None):
+    def compare(self, tenant, candidate_id, baseline_id, policy, threshold=None, idempotency_key=None):
         # Keep immutable export creation and business-key replay in one transaction.
         with self.conn():
-            return super().compare(tenant, candidate_id, baseline_id, policy, threshold)
+            return super().compare(tenant, candidate_id, baseline_id, policy, threshold, idempotency_key=idempotency_key)
 
 
 for name, method in inspect.getmembers(Store, predicate=inspect.isfunction):

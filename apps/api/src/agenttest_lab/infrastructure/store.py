@@ -300,7 +300,7 @@ class Store:
         with self.conn() as db:
             return db.execute("SELECT * FROM cases WHERE tenant_id=? AND run_id=? ORDER BY case_key", (tenant_id, run_id)).fetchall()
 
-    def compare(self, tenant_id: str, candidate_id: str, baseline_id: str, policy: str, threshold: float | None = None) -> sqlite3.Row:
+    def compare(self, tenant_id: str, candidate_id: str, baseline_id: str, policy: str, threshold: float | None = None, idempotency_key: str | None = None) -> sqlite3.Row:
         if candidate_id == baseline_id:
             raise StoreError("INVALID_COMPARISON_BINDING", "A run cannot be compared with itself", 409)
         baseline = self._run_row(tenant_id, baseline_id)
@@ -310,15 +310,30 @@ class Store:
         if baseline["version_id"] != candidate["version_id"]:
             raise StoreError("DATASET_VERSION_MISMATCH", "Baseline and candidate must use the same immutable dataset version", 409)
         effective_threshold = float(threshold if threshold is not None else max(float(baseline["threshold"] or 0), float(candidate["threshold"] or 0)))
+        fingerprint = digest({"candidate_id": candidate_id, "baseline_id": baseline_id, "policy": policy, "threshold": effective_threshold})
         with self.conn() as db:
+            if idempotency_key:
+                prior = db.execute("SELECT * FROM idempotency_keys WHERE tenant_id=? AND operation='comparison' AND key=?", (tenant_id, idempotency_key)).fetchone()
+                if prior:
+                    if prior["fingerprint"] != fingerprint:
+                        raise StoreError("IDEMPOTENCY_KEY_REUSED", "Idempotency key was already used with a different comparison request", 409)
+                    replay = db.execute("SELECT * FROM comparisons WHERE tenant_id=? AND id=?", (tenant_id, prior["resource_id"])).fetchone()
+                    if replay:
+                        return replay
+                    raise StoreError("IDEMPOTENCY_RECONCILIATION_REQUIRED", "The idempotent comparison result is unavailable", 503)
             existing = db.execute(
                 "SELECT * FROM comparisons WHERE tenant_id=? AND baseline_id=? AND candidate_id=? AND policy=?",
                 (tenant_id, baseline_id, candidate_id, policy),
             ).fetchone()
-        if existing:
-            if float(existing["threshold"]) != effective_threshold:
-                raise StoreError("COMPARISON_POLICY_CONFLICT", "The immutable comparison already uses a different threshold", 409)
-            return existing
+            if existing:
+                if float(existing["threshold"]) != effective_threshold:
+                    raise StoreError("COMPARISON_POLICY_CONFLICT", "The immutable comparison already uses a different threshold", 409)
+                if idempotency_key:
+                    db.execute(
+                        "INSERT OR IGNORE INTO idempotency_keys(tenant_id,operation,key,fingerprint,resource_id,created_at) VALUES(?,?,?,?,?,?)",
+                        (tenant_id, "comparison", idempotency_key, fingerprint, existing["id"], now()),
+                    )
+                return existing
         base_cases = self.cases(tenant_id, baseline_id)
         candidate_cases = self.cases(tenant_id, candidate_id)
         base_map, candidate_map = {row["case_key"]: row for row in base_cases}, {row["case_key"]: row for row in candidate_cases}
@@ -358,6 +373,11 @@ class Store:
                 "INSERT INTO artifact_exports VALUES(?,?,?,?,?,?,?,?)",
                 (tenant_id, str(uuid.uuid4()), artifact_id, comparison_id, "ci-verdict", artifact_sha, export_json, created),
             )
+            if idempotency_key:
+                db.execute(
+                    "INSERT INTO idempotency_keys(tenant_id,operation,key,fingerprint,resource_id,created_at) VALUES(?,?,?,?,?,?)",
+                    (tenant_id, "comparison", idempotency_key, fingerprint, comparison_id, created),
+                )
         row = self.comparison(tenant_id, comparison_id)
         assert row is not None
         return row
