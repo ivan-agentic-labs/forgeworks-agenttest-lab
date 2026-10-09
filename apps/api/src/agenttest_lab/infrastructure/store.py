@@ -77,6 +77,9 @@ class Store:
                 CREATE TABLE IF NOT EXISTS artifact_exports(tenant_id TEXT, id TEXT, artifact_id TEXT, comparison_id TEXT,
                     kind TEXT, sha256 TEXT, binding_json TEXT, created_at TEXT, PRIMARY KEY(tenant_id,id),
                     UNIQUE(tenant_id,comparison_id,kind));
+                CREATE TABLE IF NOT EXISTS idempotency_keys(tenant_id TEXT, operation TEXT, key TEXT,
+                    fingerprint TEXT, resource_id TEXT, created_at TEXT,
+                    PRIMARY KEY(tenant_id,operation,key));
                 """
             )
             # Keep local developer databases created by the MVP readable while adding the
@@ -149,8 +152,29 @@ class Store:
         grader_sha: str,
         grader_config: dict[str, Any] | None = None,
         results: Iterable[dict[str, Any]] | None = None,
+        idempotency_key: str | None = None,
     ) -> sqlite3.Row:
+        supplied = list(results) if results is not None else []
+        fingerprint = digest({
+            "version_id": version_id,
+            "build_id": build_id,
+            "grader_sha": grader_sha,
+            "grader_config": grader_config or {},
+            "results": supplied,
+        })
         with self.conn() as db:
+            if idempotency_key:
+                prior = db.execute(
+                    "SELECT * FROM idempotency_keys WHERE tenant_id=? AND operation='evaluation-run' AND key=?",
+                    (tenant_id, idempotency_key),
+                ).fetchone()
+                if prior:
+                    if prior["fingerprint"] != fingerprint:
+                        raise StoreError("IDEMPOTENCY_KEY_REUSED", "Idempotency key was already used with a different request", 409)
+                    replay = db.execute("SELECT * FROM runs WHERE tenant_id=? AND id=?", (tenant_id, prior["resource_id"])).fetchone()
+                    if replay:
+                        return replay
+                    raise StoreError("IDEMPOTENCY_RECONCILIATION_REQUIRED", "The idempotent evaluation result is unavailable", 503)
             version = db.execute("SELECT * FROM versions WHERE tenant_id=? AND id=?", (tenant_id, version_id)).fetchone()
             build = db.execute("SELECT * FROM builds WHERE tenant_id=? AND id=?", (tenant_id, build_id)).fetchone()
             if not version or not build:
@@ -167,9 +191,15 @@ class Store:
             config["seed"] = seed
             config["seed_source"] = seed_source
             config_sha = digest(config)
-            run_id, job_id, created = str(uuid.uuid4()), str(uuid.uuid4()), now()
+            if idempotency_key:
+                # Stable IDs make a retry safe even if the caller is restarted between
+                # the request and response. The request fingerprint above prevents key reuse.
+                run_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"agenttest:{tenant_id}:evaluation-run:{idempotency_key}"))
+                job_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"agenttest:{tenant_id}:evaluation-job:{idempotency_key}"))
+            else:
+                run_id, job_id = str(uuid.uuid4()), str(uuid.uuid4())
+            created = now()
             expected = int(version["case_count"])
-            supplied = list(results) if results is not None else []
             if not supplied:
                 supplied = [
                     {"case_key": f"case-{i}", "status": "PASS", "score": 1.0, "trace_digest": digest({"case_key": f"case-{i}", "synthetic": True})}
@@ -183,6 +213,11 @@ class Store:
                 "INSERT INTO runs(tenant_id,id,version_id,build_id,grader_sha,grader_config_json,grader_config_sha,threshold,seed,seed_source,status,expected_case_count,job_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (tenant_id, run_id, version_id, build_id, grader_sha, canonical_json(config), config_sha, threshold, seed, seed_source, "PENDING", expected, job_id, created),
             )
+            if idempotency_key:
+                db.execute(
+                    "INSERT INTO idempotency_keys(tenant_id,operation,key,fingerprint,resource_id,created_at) VALUES(?,?,?,?,?,?)",
+                    (tenant_id, "evaluation-run", idempotency_key, fingerprint, run_id, created),
+                )
             for i in range(1, expected + 1):
                 key = f"case-{i}"
                 item = by_key.get(key)
@@ -232,6 +267,13 @@ class Store:
         if baseline["version_id"] != candidate["version_id"]:
             raise StoreError("DATASET_VERSION_MISMATCH", "Baseline and candidate must use the same immutable dataset version", 409)
         effective_threshold = float(threshold if threshold is not None else max(float(baseline["threshold"] or 0), float(candidate["threshold"] or 0)))
+        with self.conn() as db:
+            existing = db.execute(
+                "SELECT * FROM comparisons WHERE tenant_id=? AND baseline_id=? AND candidate_id=? AND policy=?",
+                (tenant_id, baseline_id, candidate_id, policy),
+            ).fetchone()
+        if existing:
+            return existing
         base_cases = self.cases(tenant_id, baseline_id)
         candidate_cases = self.cases(tenant_id, candidate_id)
         base_map, candidate_map = {row["case_key"]: row for row in base_cases}, {row["case_key"]: row for row in candidate_cases}
@@ -254,7 +296,9 @@ class Store:
                 "baseline_source": baseline["seed_source"], "candidate_source": candidate["seed_source"],
             },
         }
-        artifact_sha = digest({"binding": binding, "paired": len(paired_keys), "missing": missing, "delta": delta, "verdict": verdict})
+        export = {"binding": binding, "paired": len(paired_keys), "missing": missing, "delta": delta, "verdict": verdict}
+        export_json = canonical_json(export)
+        artifact_sha = hashlib.sha256(export_json.encode("utf-8")).hexdigest()
         comparison_id, artifact_id, created = str(uuid.uuid4()), str(uuid.uuid4()), now()
         with self.conn() as db:
             db.execute(
@@ -263,11 +307,11 @@ class Store:
             )
             db.execute(
                 "INSERT INTO artifacts VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                (tenant_id, artifact_id, "ci-verdict-export", f"comparison-{comparison_id}.json", len(canonical_json(binding)), artifact_sha, "application/json", "AVAILABLE", "synthetic-local", None, created),
+                (tenant_id, artifact_id, "ci-verdict-export", f"comparison-{comparison_id}.json", len(export_json.encode("utf-8")), artifact_sha, "application/json", "AVAILABLE", "synthetic-local", None, created),
             )
             db.execute(
                 "INSERT INTO artifact_exports VALUES(?,?,?,?,?,?,?,?)",
-                (tenant_id, str(uuid.uuid4()), artifact_id, comparison_id, "ci-verdict", artifact_sha, canonical_json(binding), created),
+                (tenant_id, str(uuid.uuid4()), artifact_id, comparison_id, "ci-verdict", artifact_sha, export_json, created),
             )
         row = self.comparison(tenant_id, comparison_id)
         assert row is not None

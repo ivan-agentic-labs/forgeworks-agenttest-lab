@@ -159,14 +159,14 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         return {"id": bid, "status": "REGISTERED", "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "name": body.name, "build_sha256": body.build_sha256, "tool_manifest_sha256": body.tool_manifest_sha256, "prompt_version": body.prompt_version}
 
     @app.post("/v1/evaluation-runs", status_code=202)
-    def run(body: Run, c=Depends(scope("evaluation:run", store))):
+    def run(body: Run, c=Depends(scope("evaluation:run", store)), idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None):
         config = body.grader_config.model_dump(exclude_none=True) if body.grader_config else {}
         if body.threshold is not None:
             config["threshold"] = body.threshold
         if body.seed is not None:
             config["seed"] = body.seed
         try:
-            row = store.run(c["tenant_id"], str(body.dataset_version_id), str(body.agent_build_id), body.grader_sha256, config, [item.model_dump(exclude_none=True) for item in body.case_results] if body.case_results is not None else None)
+            row = store.run(c["tenant_id"], str(body.dataset_version_id), str(body.agent_build_id), body.grader_sha256, config, [item.model_dump(exclude_none=True) for item in body.case_results] if body.case_results is not None else None, idempotency_key=idempotency_key)
         except StoreError as error:
             handle_store_error(error)
         return {"id": row["id"], "status": row["status"], "created_at": row["created_at"], "dataset_version_id": row["version_id"], "agent_build_id": row["build_id"], "grader_sha256": row["grader_sha"], "grader_config_sha256": row["grader_config_sha"], "threshold": row["threshold"], "seed": row["seed"], "seed_source": row["seed_source"], "job_id": row["job_id"]}
