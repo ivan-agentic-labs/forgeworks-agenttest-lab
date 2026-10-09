@@ -28,6 +28,16 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
     with pytest.raises(ValueError,match='superuser'):PostgresStore(owner)
     store=PostgresStore(runtime)
     assert not store.member(TENANT, "unmapped-oidc-subject")
+    # Even ownership of a different product table is forbidden to runtime login/group.
+    with psycopg.connect(owner) as db:
+        db.execute('ALTER TABLE memberships OWNER TO fw_runtime_test')
+    try:
+        with pytest.raises(ValueError,match='own product tables'):
+            PostgresStore(runtime)
+    finally:
+        with psycopg.connect(owner) as db:
+            db.execute('ALTER TABLE memberships OWNER TO postgres')
+
     assert store.member(TENANT,USER) and not store.member(other,USER)
     dataset=store.dataset(TENANT,'Synthetic corpus',USER)
     peers=[PostgresStore(runtime),PostgresStore(runtime)]
