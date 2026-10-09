@@ -1,39 +1,313 @@
 from __future__ import annotations
-import sqlite3,uuid,hashlib,json
-from datetime import datetime,timezone
+
+import hashlib
+import json
+import sqlite3
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
-TENANT='00000000-0000-0000-0000-000000000001';USER='00000000-0000-0000-0000-000000000010'
-def now():return datetime.now(timezone.utc).isoformat().replace('+00:00','Z')
+from typing import Any, Iterable
+
+from agenttest_lab.domain.trace import validate_and_redact_jsonl
+
+TENANT = "00000000-0000-0000-0000-000000000001"
+USER = "00000000-0000-0000-0000-000000000010"
+SHA256 = r"^[0-9a-f]{64}$"
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def digest(value: Any) -> str:
+    return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
+
+
+class StoreError(ValueError):
+    def __init__(self, code: str, detail: str, status: int = 422):
+        self.code, self.detail, self.status = code, detail, status
+        super().__init__(detail)
+
+
 class Store:
- def __init__(self,path):self.path=path;Path(path).parent.mkdir(parents=True,exist_ok=True) if path!=':memory:' else None;self.init()
- def conn(self):c=sqlite3.connect(self.path,check_same_thread=False);c.row_factory=sqlite3.Row;return c
- def init(self):
-  with self.conn() as c:c.executescript('''CREATE TABLE IF NOT EXISTS tenants(id TEXT PRIMARY KEY,slug TEXT,status TEXT);CREATE TABLE IF NOT EXISTS memberships(tenant_id TEXT,user_id TEXT,role TEXT,status TEXT,PRIMARY KEY(tenant_id,user_id));CREATE TABLE IF NOT EXISTS datasets(tenant_id TEXT,id TEXT,name TEXT,owner_id TEXT,latest_version INTEGER,PRIMARY KEY(tenant_id,id));CREATE TABLE IF NOT EXISTS versions(tenant_id TEXT,id TEXT,dataset_id TEXT,version_number INTEGER,sha256 TEXT,case_count INTEGER,PRIMARY KEY(tenant_id,id));CREATE TABLE IF NOT EXISTS builds(tenant_id TEXT,id TEXT,name TEXT,build_sha TEXT,tool_sha TEXT,prompt_version TEXT,PRIMARY KEY(tenant_id,id));CREATE TABLE IF NOT EXISTS runs(tenant_id TEXT,id TEXT,version_id TEXT,build_id TEXT,grader_sha TEXT,status TEXT,job_id TEXT,created_at TEXT,PRIMARY KEY(tenant_id,id));CREATE TABLE IF NOT EXISTS cases(tenant_id TEXT,id TEXT,run_id TEXT,case_key TEXT,grade_status TEXT,score REAL,grader_sha TEXT,trace_digest TEXT,PRIMARY KEY(tenant_id,id));CREATE TABLE IF NOT EXISTS comparisons(tenant_id TEXT,id TEXT,baseline_id TEXT,candidate_id TEXT,paired INTEGER,missing INTEGER,delta REAL,policy TEXT,verdict TEXT,artifact_sha TEXT,PRIMARY KEY(tenant_id,id));''')
- def seed(self):
-  with self.conn() as c:c.execute('INSERT OR IGNORE INTO tenants VALUES(?,?,?)',(TENANT,'synthetic-demo','ACTIVE'));c.execute('INSERT OR IGNORE INTO memberships VALUES(?,?,?,?)',(TENANT,USER,'editor','ACTIVE'))
- def member(self,t,u):
-  with self.conn() as c:return c.execute("SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND status='ACTIVE'",(t,u)).fetchone() is not None
- def dataset(self,t,name,owner):
-  did=str(uuid.uuid4());with_=self.conn();with_.execute('INSERT INTO datasets VALUES(?,?,?,?,?)',(t,did,name,owner,0));with_.commit();with_.close();return did
- def version(self,t,did,sha,count):
-  vid=str(uuid.uuid4());
-  with self.conn() as c:c.execute('INSERT INTO versions VALUES(?,?,?,?,?,?)',(t,vid,did,1,sha,count));c.execute('UPDATE datasets SET latest_version=1 WHERE tenant_id=? AND id=?',(t,did))
-  return vid
- def build(self,t,name,bs,ts,pv):
-  bid=str(uuid.uuid4());
-  with self.conn() as c:c.execute('INSERT INTO builds VALUES(?,?,?,?,?,?)',(t,bid,name,bs,ts,pv))
-  return bid
- def run(self,t,vid,bid,grader):
-  rid,jid=str(uuid.uuid4()),str(uuid.uuid4());
-  with self.conn() as c:
-   c.execute('INSERT INTO runs VALUES(?,?,?,?,?,?,?,?)',(t,rid,vid,bid,grader,'SUCCEEDED',jid,now()))
-   for key,score in [('case-1',1.0),('case-2',0.8 if grader.endswith('f') else 1.0)]:c.execute('INSERT INTO cases VALUES(?,?,?,?,?,?,?,?)',(t,str(uuid.uuid4()),rid,key,'PASS' if score==1 else 'FAIL',score,grader,hashlib.sha256((key+'|redacted-synthetic-trace').encode()).hexdigest()))
-  with self.conn() as c:return c.execute('SELECT * FROM runs WHERE tenant_id=? AND id=?',(t,rid)).fetchone()
- def cases(self,t,rid):
-  with self.conn() as c:return c.execute('SELECT * FROM cases WHERE tenant_id=? AND run_id=?',(t,rid)).fetchall()
- def compare(self,t,candidate,baseline,policy):
-  b=self.cases(t,baseline);q=self.cases(t,candidate);bm={x['case_key']:x for x in b};qm={x['case_key']:x for x in q};paired=len(set(bm)&set(qm));missing=len(set(bm)^set(qm));delta=(sum(x['score'] for x in q)/len(q)-sum(x['score'] for x in b)/len(b)) if b and q else -1.0;verdict='PASS' if missing==0 and delta>=-0.1 and all(x['grade_status']!='MISSING' for x in q) else 'FAIL';cid=str(uuid.uuid4());art=hashlib.sha256(json.dumps({'paired':paired,'missing':missing,'delta':delta,'policy':policy,'verdict':verdict},sort_keys=True).encode()).hexdigest()
-  with self.conn() as c:c.execute('INSERT INTO comparisons VALUES(?,?,?,?,?,?,?,?,?,?)',(t,cid,baseline,candidate,paired,missing,delta,policy,verdict,art))
-  return c.execute('SELECT * FROM comparisons WHERE tenant_id=? AND id=?',(t,cid)).fetchone()
- def comparison(self,t,cid):
-  with self.conn() as c:return c.execute('SELECT * FROM comparisons WHERE tenant_id=? AND id=?',(t,cid)).fetchone()
+    def __init__(self, path: str):
+        self.path = path
+        if path != ":memory:":
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+        self.init()
+
+    def conn(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.path, check_same_thread=False)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        return connection
+
+    def init(self) -> None:
+        with self.conn() as db:
+            db.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS tenants(id TEXT PRIMARY KEY, slug TEXT, status TEXT);
+                CREATE TABLE IF NOT EXISTS memberships(tenant_id TEXT, user_id TEXT, role TEXT, status TEXT,
+                    PRIMARY KEY(tenant_id,user_id));
+                CREATE TABLE IF NOT EXISTS datasets(tenant_id TEXT, id TEXT, name TEXT, owner_id TEXT,
+                    latest_version INTEGER, PRIMARY KEY(tenant_id,id));
+                CREATE TABLE IF NOT EXISTS versions(tenant_id TEXT, id TEXT, dataset_id TEXT, version_number INTEGER,
+                    sha256 TEXT, case_count INTEGER, artifact_id TEXT, created_at TEXT, PRIMARY KEY(tenant_id,id));
+                CREATE TABLE IF NOT EXISTS builds(tenant_id TEXT, id TEXT, name TEXT, build_sha TEXT, tool_sha TEXT,
+                    prompt_version TEXT, created_at TEXT, PRIMARY KEY(tenant_id,id));
+                CREATE TABLE IF NOT EXISTS runs(tenant_id TEXT, id TEXT, version_id TEXT, build_id TEXT, grader_sha TEXT,
+                    grader_config_json TEXT, grader_config_sha TEXT, threshold REAL, seed INTEGER, seed_source TEXT,
+                    status TEXT, expected_case_count INTEGER, job_id TEXT, created_at TEXT, PRIMARY KEY(tenant_id,id));
+                CREATE TABLE IF NOT EXISTS cases(tenant_id TEXT, id TEXT, run_id TEXT, case_key TEXT, grade_status TEXT,
+                    score REAL, grader_sha TEXT, trace_digest TEXT, error_code TEXT, created_at TEXT,
+                    PRIMARY KEY(tenant_id,id), UNIQUE(tenant_id,run_id,case_key));
+                CREATE TABLE IF NOT EXISTS comparisons(tenant_id TEXT, id TEXT, baseline_id TEXT, candidate_id TEXT,
+                    baseline_version_id TEXT, candidate_version_id TEXT, baseline_build_id TEXT, candidate_build_id TEXT,
+                    baseline_grader_sha TEXT, candidate_grader_sha TEXT, baseline_config_sha TEXT, candidate_config_sha TEXT,
+                    paired INTEGER, missing INTEGER, delta REAL, threshold REAL, policy TEXT, verdict TEXT,
+                    artifact_sha TEXT, artifact_id TEXT, created_at TEXT, PRIMARY KEY(tenant_id,id),
+                    UNIQUE(tenant_id,baseline_id,candidate_id,policy));
+                CREATE TABLE IF NOT EXISTS artifacts(tenant_id TEXT, id TEXT, kind TEXT, filename TEXT, size_bytes INTEGER,
+                    sha256 TEXT, declared_media_type TEXT, status TEXT, object_generation TEXT, rejected_reason TEXT,
+                    created_at TEXT, PRIMARY KEY(tenant_id,id));
+                CREATE TABLE IF NOT EXISTS artifact_exports(tenant_id TEXT, id TEXT, artifact_id TEXT, comparison_id TEXT,
+                    kind TEXT, sha256 TEXT, binding_json TEXT, created_at TEXT, PRIMARY KEY(tenant_id,id),
+                    UNIQUE(tenant_id,comparison_id,kind));
+                """
+            )
+            # Keep local developer databases created by the MVP readable while adding the
+            # hardening columns. SQLite cannot add a NOT NULL column without a default.
+            for table, name, definition in (
+                ("versions", "artifact_id", "TEXT"), ("versions", "created_at", "TEXT"),
+                ("builds", "created_at", "TEXT"), ("runs", "grader_config_json", "TEXT"),
+                ("runs", "grader_config_sha", "TEXT"), ("runs", "threshold", "REAL"),
+                ("runs", "seed", "INTEGER"), ("runs", "seed_source", "TEXT"),
+                ("runs", "expected_case_count", "INTEGER"), ("cases", "error_code", "TEXT"),
+                ("cases", "created_at", "TEXT"), ("comparisons", "baseline_version_id", "TEXT"),
+                ("comparisons", "candidate_version_id", "TEXT"), ("comparisons", "baseline_build_id", "TEXT"),
+                ("comparisons", "candidate_build_id", "TEXT"), ("comparisons", "baseline_grader_sha", "TEXT"),
+                ("comparisons", "candidate_grader_sha", "TEXT"), ("comparisons", "baseline_config_sha", "TEXT"),
+                ("comparisons", "candidate_config_sha", "TEXT"), ("comparisons", "threshold", "REAL"),
+                ("comparisons", "artifact_id", "TEXT"), ("comparisons", "created_at", "TEXT"),
+            ):
+                columns = {row[1] for row in db.execute(f"PRAGMA table_info({table})")}
+                if name not in columns:
+                    db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+
+    def seed(self) -> None:
+        with self.conn() as db:
+            db.execute("INSERT OR IGNORE INTO tenants VALUES(?,?,?)", (TENANT, "synthetic-demo", "ACTIVE"))
+            db.execute("INSERT OR IGNORE INTO memberships VALUES(?,?,?,?)", (TENANT, USER, "editor", "ACTIVE"))
+
+    def member(self, tenant_id: str, user_id: str) -> bool:
+        with self.conn() as db:
+            return db.execute(
+                "SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND status='ACTIVE'",
+                (tenant_id, user_id),
+            ).fetchone() is not None
+
+    def dataset(self, tenant_id: str, name: str, owner: str) -> str:
+        dataset_id = str(uuid.uuid4())
+        with self.conn() as db:
+            db.execute("INSERT INTO datasets VALUES(?,?,?,?,?)", (tenant_id, dataset_id, name, owner, 0))
+        return dataset_id
+
+    def version(self, tenant_id: str, dataset_id: str, sha256: str, case_count: int, artifact_id: str | None = None) -> str:
+        version_id = str(uuid.uuid4())
+        with self.conn() as db:
+            dataset = db.execute("SELECT latest_version FROM datasets WHERE tenant_id=? AND id=?", (tenant_id, dataset_id)).fetchone()
+            if not dataset:
+                raise StoreError("RESOURCE_NOT_FOUND", "Dataset is not visible", 404)
+            version_number = int(dataset["latest_version"]) + 1
+            created = now()
+            db.execute(
+                "INSERT INTO versions VALUES(?,?,?,?,?,?,?,?)",
+                (tenant_id, version_id, dataset_id, version_number, sha256, case_count, artifact_id, created),
+            )
+            db.execute("UPDATE datasets SET latest_version=? WHERE tenant_id=? AND id=?", (version_number, tenant_id, dataset_id))
+        return version_id
+
+    def build(self, tenant_id: str, name: str, build_sha: str, tool_sha: str, prompt_version: str) -> str:
+        build_id = str(uuid.uuid4())
+        with self.conn() as db:
+            db.execute("INSERT INTO builds VALUES(?,?,?,?,?,?,?)", (tenant_id, build_id, name, build_sha, tool_sha, prompt_version, now()))
+        return build_id
+
+    def _run_row(self, tenant_id: str, run_id: str) -> sqlite3.Row | None:
+        with self.conn() as db:
+            return db.execute("SELECT * FROM runs WHERE tenant_id=? AND id=?", (tenant_id, run_id)).fetchone()
+
+    def run(
+        self,
+        tenant_id: str,
+        version_id: str,
+        build_id: str,
+        grader_sha: str,
+        grader_config: dict[str, Any] | None = None,
+        results: Iterable[dict[str, Any]] | None = None,
+    ) -> sqlite3.Row:
+        with self.conn() as db:
+            version = db.execute("SELECT * FROM versions WHERE tenant_id=? AND id=?", (tenant_id, version_id)).fetchone()
+            build = db.execute("SELECT * FROM builds WHERE tenant_id=? AND id=?", (tenant_id, build_id)).fetchone()
+            if not version or not build:
+                raise StoreError("RESOURCE_NOT_FOUND", "Dataset version or agent build is not visible", 404)
+            config = dict(grader_config or {})
+            threshold = float(config.get("threshold", 0.0))
+            if not 0.0 <= threshold <= 1.0:
+                raise StoreError("INVALID_GRADER_CONFIGURATION", "threshold must be between 0 and 1")
+            seed = config.get("seed")
+            if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
+                raise StoreError("INVALID_GRADER_CONFIGURATION", "seed must be an integer")
+            seed_source = str(config.get("seed_source", "request" if seed is not None else "deterministic-default"))
+            config["threshold"] = threshold
+            config["seed"] = seed
+            config["seed_source"] = seed_source
+            config_sha = digest(config)
+            run_id, job_id, created = str(uuid.uuid4()), str(uuid.uuid4()), now()
+            expected = int(version["case_count"])
+            supplied = list(results) if results is not None else []
+            if not supplied:
+                supplied = [
+                    {"case_key": f"case-{i}", "status": "PASS", "score": 1.0, "trace_digest": digest({"case_key": f"case-{i}", "synthetic": True})}
+                    for i in range(1, expected + 1)
+                ]
+                if grader_sha.endswith("f") and expected >= 2:
+                    supplied[1] = {**supplied[1], "status": "FAIL", "score": 0.8}
+            by_key = {str(item.get("case_key", "")): item for item in supplied if isinstance(item, dict)}
+            complete = True
+            db.execute(
+                "INSERT INTO runs(tenant_id,id,version_id,build_id,grader_sha,grader_config_json,grader_config_sha,threshold,seed,seed_source,status,expected_case_count,job_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (tenant_id, run_id, version_id, build_id, grader_sha, canonical_json(config), config_sha, threshold, seed, seed_source, "PENDING", expected, job_id, created),
+            )
+            for i in range(1, expected + 1):
+                key = f"case-{i}"
+                item = by_key.get(key)
+                if item is None:
+                    status, score, error_code, trace_digest = "MISSING", None, "MISSING_RESULT", digest({"case_key": key, "missing": True})
+                    complete = False
+                else:
+                    status = str(item.get("status", item.get("grade_status", "INVALID_RESULT"))).upper()
+                    raw_score = item.get("score")
+                    valid_score = isinstance(raw_score, (int, float)) and not isinstance(raw_score, bool) and 0 <= float(raw_score) <= 1
+                    if status in {"MISSING", "TIMEOUT"}:
+                        score, error_code, complete = None, status, False
+                    elif status not in {"PASS", "FAIL"} or not valid_score:
+                        status, score, error_code, complete = "INVALID_RESULT", None, "INVALID_RESULT", False
+                    else:
+                        score, error_code = float(raw_score), None
+                        if status != "PASS": complete = False
+                    if status in {"MISSING", "TIMEOUT", "INVALID_RESULT"}:
+                        complete = False
+                    trace_digest = str(item.get("trace_digest") or digest({"case_key": key, "status": status, "score": score}))
+                    if item.get("trace_jsonl") is not None:
+                        try:
+                            trace_digest = validate_and_redact_jsonl(item["trace_jsonl"]).sha256
+                        except Exception:
+                            status, score, error_code, complete = "INVALID_RESULT", None, "INVALID_TRACE", False
+                db.execute(
+                    "INSERT INTO cases VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (tenant_id, str(uuid.uuid4()), run_id, key, status, score, grader_sha, trace_digest, error_code, created),
+                )
+            status = "SUCCEEDED" if complete else "PARTIAL"
+            db.execute("UPDATE runs SET status=? WHERE tenant_id=? AND id=?", (status, tenant_id, run_id))
+        row = self._run_row(tenant_id, run_id)
+        assert row is not None
+        return row
+
+    def cases(self, tenant_id: str, run_id: str) -> list[sqlite3.Row]:
+        with self.conn() as db:
+            return db.execute("SELECT * FROM cases WHERE tenant_id=? AND run_id=? ORDER BY case_key", (tenant_id, run_id)).fetchall()
+
+    def compare(self, tenant_id: str, candidate_id: str, baseline_id: str, policy: str, threshold: float | None = None) -> sqlite3.Row:
+        if candidate_id == baseline_id:
+            raise StoreError("INVALID_COMPARISON_BINDING", "A run cannot be compared with itself", 409)
+        baseline = self._run_row(tenant_id, baseline_id)
+        candidate = self._run_row(tenant_id, candidate_id)
+        if not baseline or not candidate:
+            raise StoreError("RESOURCE_NOT_FOUND", "Baseline or candidate run is not visible", 404)
+        if baseline["version_id"] != candidate["version_id"]:
+            raise StoreError("DATASET_VERSION_MISMATCH", "Baseline and candidate must use the same immutable dataset version", 409)
+        effective_threshold = float(threshold if threshold is not None else max(float(baseline["threshold"] or 0), float(candidate["threshold"] or 0)))
+        base_cases = self.cases(tenant_id, baseline_id)
+        candidate_cases = self.cases(tenant_id, candidate_id)
+        base_map, candidate_map = {row["case_key"]: row for row in base_cases}, {row["case_key"]: row for row in candidate_cases}
+        paired_keys = sorted(set(base_map) & set(candidate_map))
+        terminal_statuses = {"MISSING", "TIMEOUT", "INVALID_RESULT"}
+        missing = len(set(base_map) ^ set(candidate_map)) + sum(1 for key in paired_keys if base_map[key]["grade_status"] in terminal_statuses or candidate_map[key]["grade_status"] in terminal_statuses)
+        base_scores = [float(base_map[key]["score"]) for key in paired_keys if base_map[key]["score"] is not None]
+        candidate_scores = [float(candidate_map[key]["score"]) for key in paired_keys if candidate_map[key]["score"] is not None]
+        delta = (sum(candidate_scores) / len(candidate_scores) - sum(base_scores) / len(base_scores)) if base_scores and candidate_scores else -1.0
+        bad_status = any(row["grade_status"] in terminal_statuses for row in (*base_cases, *candidate_cases))
+        verdict = "PASS" if missing == 0 and not bad_status and delta >= -effective_threshold else "FAIL"
+        binding = {
+            "baseline_run_id": baseline_id, "candidate_run_id": candidate_id,
+            "dataset_version_id": baseline["version_id"], "baseline_build_id": baseline["build_id"],
+            "candidate_build_id": candidate["build_id"], "baseline_grader_sha256": baseline["grader_sha"],
+            "candidate_grader_sha256": candidate["grader_sha"], "baseline_grader_config_sha256": baseline["grader_config_sha"],
+            "candidate_grader_config_sha256": candidate["grader_config_sha"], "policy_version": policy,
+            "threshold": effective_threshold, "seed_provenance": {
+                "baseline_seed": baseline["seed"], "candidate_seed": candidate["seed"],
+                "baseline_source": baseline["seed_source"], "candidate_source": candidate["seed_source"],
+            },
+        }
+        artifact_sha = digest({"binding": binding, "paired": len(paired_keys), "missing": missing, "delta": delta, "verdict": verdict})
+        comparison_id, artifact_id, created = str(uuid.uuid4()), str(uuid.uuid4()), now()
+        with self.conn() as db:
+            db.execute(
+                "INSERT INTO comparisons(tenant_id,id,baseline_id,candidate_id,baseline_version_id,candidate_version_id,baseline_build_id,candidate_build_id,baseline_grader_sha,candidate_grader_sha,baseline_config_sha,candidate_config_sha,paired,missing,delta,threshold,policy,verdict,artifact_sha,artifact_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (tenant_id, comparison_id, baseline_id, candidate_id, baseline["version_id"], candidate["version_id"], baseline["build_id"], candidate["build_id"], baseline["grader_sha"], candidate["grader_sha"], baseline["grader_config_sha"], candidate["grader_config_sha"], len(paired_keys), missing, delta, effective_threshold, policy, verdict, artifact_sha, artifact_id, created),
+            )
+            db.execute(
+                "INSERT INTO artifacts VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (tenant_id, artifact_id, "ci-verdict-export", f"comparison-{comparison_id}.json", len(canonical_json(binding)), artifact_sha, "application/json", "AVAILABLE", "synthetic-local", None, created),
+            )
+            db.execute(
+                "INSERT INTO artifact_exports VALUES(?,?,?,?,?,?,?,?)",
+                (tenant_id, str(uuid.uuid4()), artifact_id, comparison_id, "ci-verdict", artifact_sha, canonical_json(binding), created),
+            )
+        row = self.comparison(tenant_id, comparison_id)
+        assert row is not None
+        return row
+
+    def comparison(self, tenant_id: str, comparison_id: str) -> sqlite3.Row | None:
+        with self.conn() as db:
+            return db.execute("SELECT * FROM comparisons WHERE tenant_id=? AND id=?", (tenant_id, comparison_id)).fetchone()
+
+    def artifact_intent(self, tenant_id: str, kind: str, filename: str, size_bytes: int, sha256: str, media_type: str | None) -> sqlite3.Row:
+        artifact_id, created = str(uuid.uuid4()), now()
+        with self.conn() as db:
+            db.execute("INSERT INTO artifacts VALUES(?,?,?,?,?,?,?,?,?,?,?)", (tenant_id, artifact_id, kind, filename, size_bytes, sha256, media_type, "INTENT_ISSUED", None, None, created))
+        row = self.artifact(tenant_id, artifact_id)
+        assert row is not None
+        return row
+
+    def artifact_commit(self, tenant_id: str, artifact_id: str, sha256: str, size_bytes: int, generation: str) -> sqlite3.Row:
+        with self.conn() as db:
+            row = db.execute("SELECT * FROM artifacts WHERE tenant_id=? AND id=?", (tenant_id, artifact_id)).fetchone()
+            if not row:
+                raise StoreError("RESOURCE_NOT_FOUND", "Artifact is not visible", 404)
+            if row["status"] != "INTENT_ISSUED":
+                raise StoreError("ARTIFACT_NOT_PENDING", "Artifact is immutable and cannot be committed again", 409)
+            if row["sha256"] != sha256 or int(row["size_bytes"]) != size_bytes:
+                db.execute("UPDATE artifacts SET status='REJECTED', rejected_reason='CHECKSUM_OR_SIZE_MISMATCH' WHERE tenant_id=? AND id=?", (tenant_id, artifact_id))
+                raise StoreError("ARTIFACT_INTEGRITY_MISMATCH", "Committed artifact does not match its upload intent", 409)
+            db.execute("UPDATE artifacts SET status='AVAILABLE', object_generation=? WHERE tenant_id=? AND id=?", (generation, tenant_id, artifact_id))
+        result = self.artifact(tenant_id, artifact_id)
+        assert result is not None
+        return result
+
+    def artifact(self, tenant_id: str, artifact_id: str) -> sqlite3.Row | None:
+        with self.conn() as db:
+            return db.execute("SELECT * FROM artifacts WHERE tenant_id=? AND id=?", (tenant_id, artifact_id)).fetchone()
+
+    def download_intent(self, tenant_id: str, artifact_id: str) -> sqlite3.Row:
+        row = self.artifact(tenant_id, artifact_id)
+        if not row:
+            raise StoreError("RESOURCE_NOT_FOUND", "Artifact is not visible", 404)
+        if row["status"] != "AVAILABLE":
+            raise StoreError("ARTIFACT_NOT_AVAILABLE", "Artifact is not available for download", 409)
+        return row

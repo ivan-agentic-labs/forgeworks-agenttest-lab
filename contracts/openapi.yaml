@@ -1109,6 +1109,19 @@ components:
         grader_sha256:
           type: string
           pattern: ^[0-9a-f]{64}$
+        grader_config_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+        seed:
+          type:
+          - integer
+          - 'null'
+        seed_source:
+          type: string
         job_id:
           type: string
           format: uuid
@@ -1135,13 +1148,19 @@ components:
         grade_status:
           type: string
         score:
-          type: number
+          type:
+          - number
+          - 'null'
         grader_sha256:
           type: string
           pattern: ^[0-9a-f]{64}$
         trace_digest:
           type: string
           pattern: ^[0-9a-f]{64}$
+        error_code:
+          type:
+          - string
+          - 'null'
     RegressionComparison:
       type: object
       additionalProperties: false
@@ -1178,6 +1197,15 @@ components:
           type: number
         policy_version:
           type: string
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+        artifact_id:
+          type: string
+          format: uuid
+        binding:
+          $ref: '#/components/schemas/ComparisonBinding'
     CIVerdict:
       type: object
       additionalProperties: false
@@ -1208,6 +1236,11 @@ components:
         signed_artifact_sha256:
           type: string
           pattern: ^[0-9a-f]{64}$
+        artifact_id:
+          type: string
+          format: uuid
+        binding:
+          $ref: '#/components/schemas/ComparisonBinding'
     CreateDatasetRequest:
       type: object
       additionalProperties: false
@@ -1268,6 +1301,18 @@ components:
         grader_sha256:
           type: string
           pattern: ^[0-9a-f]{64}$
+        grader_config:
+          $ref: '#/components/schemas/GraderConfig'
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+        seed:
+          type: integer
+        case_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CaseResultInput'
     CreateComparisonRequest:
       type: object
       additionalProperties: false
@@ -1280,6 +1325,68 @@ components:
           format: uuid
         policy_version:
           type: string
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    GraderConfig:
+      type: object
+      additionalProperties: true
+      properties:
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+        seed:
+          type: integer
+        seed_source:
+          type: string
+          minLength: 1
+
+    CaseResultInput:
+      type: object
+      additionalProperties: false
+      required:
+      - case_key
+      properties:
+        case_key:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum: [PASS, FAIL, MISSING, TIMEOUT, INVALID_RESULT]
+        score:
+          type:
+          - number
+          - 'null'
+        trace_jsonl:
+          type: string
+        trace_digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+
+    ComparisonBinding:
+      type: object
+      additionalProperties: true
+      required:
+      - dataset_version_id
+      properties:
+        dataset_version_id:
+          type: string
+          format: uuid
+        baseline_build_id:
+          type: string
+          format: uuid
+        candidate_build_id:
+          type: string
+          format: uuid
+        baseline_grader_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        candidate_grader_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
     EvalCasePage:
       type: object
       additionalProperties: false
