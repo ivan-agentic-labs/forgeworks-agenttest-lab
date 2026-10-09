@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import json
 import sqlite3
 import uuid
@@ -122,6 +123,7 @@ class Store:
     def version(self, tenant_id: str, dataset_id: str, sha256: str, case_count: int, artifact_id: str | None = None) -> str:
         version_id = str(uuid.uuid4())
         with self.conn() as db:
+            db.execute("BEGIN IMMEDIATE")
             dataset = db.execute("SELECT latest_version FROM datasets WHERE tenant_id=? AND id=?", (tenant_id, dataset_id)).fetchone()
             if not dataset:
                 raise StoreError("RESOURCE_NOT_FOUND", "Dataset is not visible", 404)
@@ -201,6 +203,8 @@ class Store:
             created = now()
             expected = int(version["case_count"])
             if not supplied:
+                if os.getenv("AGENTTEST_SYNTHETIC_MODE") != "1" or os.getenv("APP_ENV") not in {"development", "test"}:
+                    raise StoreError("AGENT_EXECUTION_DISABLED", "Supply actual case results; synthetic evaluation requires explicit development/test opt-in", 503)
                 supplied = [
                     {"case_key": f"case-{i}", "status": "PASS", "score": 1.0, "trace_digest": digest({"case_key": f"case-{i}", "synthetic": True})}
                     for i in range(1, expected + 1)
@@ -273,6 +277,8 @@ class Store:
                 (tenant_id, baseline_id, candidate_id, policy),
             ).fetchone()
         if existing:
+            if float(existing["threshold"]) != effective_threshold:
+                raise StoreError("COMPARISON_POLICY_CONFLICT", "The immutable comparison already uses a different threshold", 409)
             return existing
         base_cases = self.cases(tenant_id, baseline_id)
         candidate_cases = self.cases(tenant_id, candidate_id)
@@ -355,3 +361,4 @@ class Store:
         if row["status"] != "AVAILABLE":
             raise StoreError("ARTIFACT_NOT_AVAILABLE", "Artifact is not available for download", 409)
         return row
+

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from agenttest_lab.presentation.authentication import decode_bearer
 
 import os
 from datetime import datetime, timedelta, timezone
@@ -91,19 +92,8 @@ def reject(status: int, code: str, detail: str) -> None:
     raise HTTPException(status_code=status, detail={"type": "about:blank", "title": "Request rejected", "status": status, "code": code, "detail": detail, "request_id": "runtime"})
 
 
-def auth(authorization: Annotated[str | None, Header()] = None) -> dict[str, Any]:
-    if not authorization or not authorization.startswith("Bearer "):
-        reject(401, "UNAUTHENTICATED", "Bearer token is required")
-    try:
-        return jwt.decode(
-            authorization[7:],
-            os.getenv("DEV_AUTH_SECRET", "forgeworks-development-secret-32-plus"),
-            algorithms=["HS256"],
-            issuer=os.getenv("AUTH_ISSUER", "https://issuer.synthetic.invalid"),
-            audience=os.getenv("AUTH_AUDIENCE", "forgeworks-api"),
-        )
-    except jwt.PyJWTError:
-        reject(401, "INVALID_TOKEN", "Token signature, issuer, audience, or expiry is invalid")
+def auth(authorization: Annotated[str | None, Header()] = None):
+    return decode_bearer(authorization)
 
 
 def scope(required: str, store: Store):
@@ -151,7 +141,9 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             vid = store.version(c["tenant_id"], str(did), body.sha256, body.case_count, str(body.artifact_id))
         except StoreError as error:
             handle_store_error(error)
-        return {"id": vid, "status": "IMMUTABLE", "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "dataset_id": str(did), "version_number": 1, "sha256": body.sha256, "case_count": body.case_count}
+        with store.conn() as db:
+            version = db.execute("SELECT * FROM versions WHERE tenant_id=? AND id=?", (c["tenant_id"], vid)).fetchone()
+        return {"id": vid, "status": "IMMUTABLE", "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "dataset_id": str(did), "version_number": version["version_number"], "sha256": body.sha256, "case_count": body.case_count}
 
     @app.post("/v1/agent-builds", status_code=201)
     def build(body: Build, c=Depends(scope("build:write", store))):
@@ -189,7 +181,13 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         row = store.comparison(c["tenant_id"], str(cid))
         if not row:
             reject(404, "RESOURCE_NOT_FOUND", "Comparison is not visible")
-        return {"id": row["id"], "status": "SIGNED", "created_at": row["created_at"], "comparison_id": row["id"], "verdict": row["verdict"], "policy_version": row["policy"], "signed_artifact_sha256": row["artifact_sha"], "artifact_id": row["artifact_id"], "binding": {"dataset_version_id": row["baseline_version_id"], "baseline_run_id": row["baseline_id"], "candidate_run_id": row["candidate_id"], "threshold": row["threshold"]}}
+        from agenttest_lab.infrastructure.verdict_signing import sign_export
+        with store.conn() as db:
+            export = db.execute("SELECT binding_json FROM artifact_exports WHERE tenant_id=? AND comparison_id=? AND kind='ci-verdict'", (c["tenant_id"], row["id"])).fetchone()
+        if not export:
+            reject(409, "VERDICT_EXPORT_MISSING", "Immutable verdict export is unavailable")
+        signature = sign_export(export["binding_json"], row["artifact_sha"])
+        return {"id": row["id"], "status": "SIGNED", "created_at": row["created_at"], "comparison_id": row["id"], "verdict": row["verdict"], "policy_version": row["policy"], "signed_artifact_sha256": row["artifact_sha"], "artifact_id": row["artifact_id"], "binding": {"dataset_version_id": row["baseline_version_id"], "baseline_run_id": row["baseline_id"], "candidate_run_id": row["candidate_id"], "threshold": row["threshold"]}, **signature}
 
     @app.post("/v1/artifacts/upload-intents", status_code=201)
     def upload_intent(body: UploadIntentRequest, c=Depends(scope("artifact:create", store))):
@@ -235,3 +233,4 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
 
 app = create_app(seed=os.getenv("AGENTTEST_SEED_FIXTURE", "0") == "1")
+

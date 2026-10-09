@@ -1217,6 +1217,10 @@ components:
       - verdict
       - policy_version
       - signed_artifact_sha256
+      - signature_algorithm
+      - signature
+      - signing_key_id
+      - signed_payload
       properties:
         id:
           type: string
@@ -1241,6 +1245,14 @@ components:
           format: uuid
         binding:
           $ref: '#/components/schemas/ComparisonBinding'
+        signature_algorithm:
+          type: string
+        signature:
+          type: string
+        signing_key_id:
+          type: string
+        signed_payload:
+          type: string
     CreateDatasetRequest:
       type: object
       additionalProperties: false
@@ -1329,7 +1341,6 @@ components:
           type: number
           minimum: 0
           maximum: 1
-
     GraderConfig:
       type: object
       additionalProperties: true
@@ -1343,7 +1354,6 @@ components:
         seed_source:
           type: string
           minLength: 1
-
     CaseResultInput:
       type: object
       additionalProperties: false
@@ -1355,7 +1365,12 @@ components:
           minLength: 1
         status:
           type: string
-          enum: [PASS, FAIL, MISSING, TIMEOUT, INVALID_RESULT]
+          enum:
+          - PASS
+          - FAIL
+          - MISSING
+          - TIMEOUT
+          - INVALID_RESULT
         score:
           type:
           - number
@@ -1365,7 +1380,6 @@ components:
         trace_digest:
           type: string
           pattern: ^[0-9a-f]{64}$
-
     ComparisonBinding:
       type: object
       additionalProperties: true
