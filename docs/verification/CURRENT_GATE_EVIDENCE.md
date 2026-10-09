@@ -28,6 +28,8 @@ Source: `5a279750c65cc97ade3606ee9e0e66bbe1639b48`. This immutable receipt cover
 
 ## Current product scope
 
+Disposable logical restore verification now compares actual tenant RLS policy expressions/role bindings, table grants, and non-internal trigger definitions/functions, in addition to row digests, columns, constraints and RLS flags. This remains a logical disposable proof, not PITR, regional failover or production operating acceptance.
+
 Persist supplied case results, compare immutable bindings, sign Ed25519 verdicts and download actual persisted exports. External uploads remain quarantined; dataset source ingestion and external agent execution are unproven.
 
 ## Remaining dependency and implementation register
