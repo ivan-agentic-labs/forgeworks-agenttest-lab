@@ -1,5 +1,5 @@
 from __future__ import annotations
-from agenttest_lab.presentation.authentication import decode_bearer
+from agenttest_lab.presentation.authentication import decode_bearer, verify_session
 
 import os
 import hashlib
@@ -100,6 +100,7 @@ def auth(authorization: Annotated[str | None, Header()] = None):
 
 def scope(required: str, store: Store):
     def dependency(c: dict[str, Any] = Depends(auth)) -> dict[str, Any]:
+        verify_session(store, c)
         if not c.get("tenant_id") or not c.get("sub") or not store.member(str(c["tenant_id"]), str(c["sub"])):
             reject(403, "TENANT_CONTEXT_INVALID", "Verified membership is required")
         if required not in set(str(c.get("scope", "")).split()):
@@ -133,6 +134,11 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     @app.exception_handler(HTTPException)
     async def errors(_, error: HTTPException):
         return JSONResponse(status_code=error.status_code, content=error.detail if isinstance(error.detail, dict) else {"type": "about:blank", "title": "Request rejected", "status": error.status_code, "code": "REQUEST_REJECTED", "detail": str(error.detail), "request_id": "runtime"})
+
+    @app.get("/readyz")
+    def ready():
+        from agenttest_lab.presentation.authentication import readiness
+        return readiness(store)
 
     @app.get("/healthz")
     def health() -> dict[str, str]:
