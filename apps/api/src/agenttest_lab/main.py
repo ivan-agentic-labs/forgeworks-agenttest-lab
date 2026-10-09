@@ -116,7 +116,13 @@ def iso_created(row: Any) -> str:
 
 
 def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
-    store = Store(db_path or os.getenv("AGENTTEST_DB_PATH", str(ROOT / ".runtime/agenttest.db")))
+    if os.getenv("AGENTTEST_DATABASE_URL"):
+        from agenttest_lab.infrastructure.postgres_store import PostgresStore
+        store = PostgresStore(os.environ["AGENTTEST_DATABASE_URL"])
+    else:
+        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+            raise ValueError("SQLite is restricted to development/test")
+        store = Store(db_path or os.getenv("AGENTTEST_DB_PATH", str(ROOT / ".runtime/agenttest.db")))
     if seed:
         store.seed()
     app = FastAPI(title="AgentTest Lab MVP", version="0.2.0")
@@ -141,7 +147,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
             vid = store.version(c["tenant_id"], str(did), body.sha256, body.case_count, str(body.artifact_id))
         except StoreError as error:
             handle_store_error(error)
-        with store.conn() as db:
+        with store.conn(c["tenant_id"]) as db:
             version = db.execute("SELECT * FROM versions WHERE tenant_id=? AND id=?", (c["tenant_id"], vid)).fetchone()
         return {"id": vid, "status": "IMMUTABLE", "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "dataset_id": str(did), "version_number": version["version_number"], "sha256": body.sha256, "case_count": body.case_count}
 
@@ -182,7 +188,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         if not row:
             reject(404, "RESOURCE_NOT_FOUND", "Comparison is not visible")
         from agenttest_lab.infrastructure.verdict_signing import sign_export
-        with store.conn() as db:
+        with store.conn(c["tenant_id"]) as db:
             export = db.execute("SELECT binding_json FROM artifact_exports WHERE tenant_id=? AND comparison_id=? AND kind='ci-verdict'", (c["tenant_id"], row["id"])).fetchone()
         if not export:
             reject(409, "VERDICT_EXPORT_MISSING", "Immutable verdict export is unavailable")
@@ -219,7 +225,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @app.get("/v1/jobs/{jid}")
     def job(jid: UUID, c=Depends(scope("job:read", store))):
-        with store.conn() as db:
+        with store.conn(c["tenant_id"]) as db:
             row = db.execute("SELECT * FROM runs WHERE tenant_id=? AND job_id=?", (c["tenant_id"], str(jid))).fetchone()
         if not row:
             reject(404, "RESOURCE_NOT_FOUND", "Job is not visible")

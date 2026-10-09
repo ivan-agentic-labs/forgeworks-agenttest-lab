@@ -41,7 +41,7 @@ class Store:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.init()
 
-    def conn(self) -> sqlite3.Connection:
+    def conn(self, tenant=None) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, check_same_thread=False)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")

@@ -1,0 +1,7 @@
+# AgentTest PostgreSQL runtime
+
+The runtime adapter extends canonical dataset/version/build/evaluation/case tables through separately applied migrations 001/002. A non-owner runtime login assumes the tenant NOLOGIN/NOSUPERUSER/NOBYPASSRLS role. Outer transactions set tenant context locally, take a conservative tenant advisory lock and close the connection afterward. Nested commands reuse that transaction without allowing tenant/store changes. SQLite remains development/test only.
+
+Dataset versions are serialized across independent adapters and protected by their business-key constraint. Evaluation idempotency and immutable comparison/export creation are atomic database transactions. Missing, timeout and invalid cases have null scores; they remain PARTIAL rather than fabricated zero/PASS results. Database checks bound scored cases to [0,1]. Runtime cannot update/delete dataset versions, case results, comparisons, exports or idempotency receipts.
+
+Immutable export binding_json remains TEXT so Ed25519 signs the same exact persisted bytes. PostgreSQL numeric scores are converted to Python floats for the existing scoring model; this is an evaluation score, not money arithmetic. The dedicated disposable proof covers concurrent versions/comparisons, actual supplied results, missing results, replay conflict, RLS and cryptographic verification through the real API route. It does not execute an external agent/provider, prove dataset artifact ingestion, establish production performance/recovery, or accept G1-E.
