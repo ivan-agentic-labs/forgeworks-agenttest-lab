@@ -34,6 +34,10 @@ Persist supplied case results, compare immutable bindings, sign Ed25519 verdicts
 
 ## Remaining dependency and implementation register
 
+### Verified dataset ingestion continuation, 2026-10-09
+
+Version creation accepts exact inline UTF-8 JSONL with case_key/input/expected per row, verifies digest/count, rejects duplicate JSON and case keys, non-finite numbers and structural budgets, and atomically persists immutable tenant-scoped dataset source snapshots. Migration 003 gives runtime SELECT/INSERT only with forced RLS and tenant-qualified FK. Evaluation re-verifies the snapshot and uses its actual ordered case keys. Missing source versions fail closed outside explicitly seeded development/test stores. artifact_id remains caller metadata and is not a verified external storage object. Supplied case scores are caller evidence, not proof of provider execution; external storage, provider adapter and observed evaluation quality remain open.
+
 ### Evaluation evidence continuation, 2026-10-09
 
 Duplicate case keys now fail instead of silently overwriting evidence; unknown keys fail instead of being ignored. Current metadata-only versions still define positional `case-1` through `case-N` keys, not verified uploaded datasets. Missing expected results remain PARTIAL with null scores. Dataset/run budgets are 1000 cases, keys are bounded to 128 characters, and seeds must fit signed 64-bit PostgreSQL storage. Regression tests verify typed failures and no persisted run on invalid case binding. Actual dataset-byte ingestion and provider execution remain unfinished.

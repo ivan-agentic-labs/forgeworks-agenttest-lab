@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from agenttest_lab.domain.trace import validate_and_redact_jsonl
+from agenttest_lab.domain.dataset import parse_dataset
 
 TENANT = "00000000-0000-0000-0000-000000000001"
 USER = "00000000-0000-0000-0000-000000000010"
@@ -58,6 +59,7 @@ class Store:
                     latest_version INTEGER, PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS versions(tenant_id TEXT, id TEXT, dataset_id TEXT, version_number INTEGER,
                     sha256 TEXT, case_count INTEGER, artifact_id TEXT, created_at TEXT, PRIMARY KEY(tenant_id,id));
+                CREATE TABLE IF NOT EXISTS dataset_sources(tenant_id TEXT,version_id TEXT,source_jsonl TEXT,PRIMARY KEY(tenant_id,version_id));
                 CREATE TABLE IF NOT EXISTS builds(tenant_id TEXT, id TEXT, name TEXT, build_sha TEXT, tool_sha TEXT,
                     prompt_version TEXT, created_at TEXT, PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS runs(tenant_id TEXT, id TEXT, version_id TEXT, build_id TEXT, grader_sha TEXT,
@@ -103,6 +105,9 @@ class Store:
                     db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
     def seed(self) -> None:
+        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+            raise ValueError("Fixture seeding is restricted to development/test")
+        self.allow_fixture_versions = True
         with self.conn() as db:
             db.execute("INSERT OR IGNORE INTO tenants VALUES(?,?,?)", (TENANT, "synthetic-demo", "ACTIVE"))
             db.execute("INSERT OR IGNORE INTO memberships VALUES(?,?,?,?)", (TENANT, USER, "editor", "ACTIVE"))
@@ -120,9 +125,16 @@ class Store:
             db.execute("INSERT INTO datasets VALUES(?,?,?,?,?)", (tenant_id, dataset_id, name, owner, 0))
         return dataset_id
 
-    def version(self, tenant_id: str, dataset_id: str, sha256: str, case_count: int, artifact_id: str | None = None) -> str:
+    def version(self, tenant_id: str, dataset_id: str, sha256: str, case_count: int, artifact_id: str | None = None, source_jsonl: str | None = None) -> str:
         if isinstance(case_count, bool) or not isinstance(case_count, int) or not 1 <= case_count <= 1000:
             raise StoreError("DATASET_BUDGET_EXCEEDED", "Dataset versions require 1 to 1000 cases")
+        if source_jsonl is not None:
+            try:
+                parse_dataset(source_jsonl, sha256, case_count)
+            except (ValueError, UnicodeError) as error:
+                raise StoreError("DATASET_SOURCE_INVALID", str(error)) from error
+        elif not (getattr(self, "allow_fixture_versions", False) and os.getenv("APP_ENV", "development") in {"development", "test"}):
+            raise StoreError("DATASET_SOURCE_REQUIRED", "Dataset source JSONL bytes are required; metadata alone is not ingestion", 409)
         version_id = str(uuid.uuid4())
         with self.conn() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -136,6 +148,8 @@ class Store:
                 (tenant_id, version_id, dataset_id, version_number, sha256, case_count, artifact_id, created),
             )
             db.execute("UPDATE datasets SET latest_version=? WHERE tenant_id=? AND id=?", (version_number, tenant_id, dataset_id))
+            if source_jsonl is not None:
+                db.execute("INSERT INTO dataset_sources(tenant_id,version_id,source_jsonl) VALUES(?,?,?)", (tenant_id, version_id, source_jsonl))
         return version_id
 
     def build(self, tenant_id: str, name: str, build_sha: str, tool_sha: str, prompt_version: str) -> str:
@@ -215,15 +229,25 @@ class Store:
             expected = int(version["case_count"])
             if not 1 <= expected <= 1000:
                 raise StoreError("EVALUATION_BUDGET_EXCEEDED", "Stored dataset exceeds the evaluation case budget")
-            expected_keys = {f"case-{i}" for i in range(1, expected + 1)}
+            source = db.execute("SELECT * FROM dataset_sources WHERE tenant_id=? AND version_id=?", (tenant_id, version_id)).fetchone()
+            if source:
+                try:
+                    ordered_keys = [case["case_key"] for case in parse_dataset(source["source_jsonl"], version["sha256"], expected)]
+                except (ValueError, UnicodeError) as error:
+                    raise StoreError("DATASET_SOURCE_INTEGRITY_FAILED", str(error), 409) from error
+            elif getattr(self, "allow_fixture_versions", False) and os.getenv("APP_ENV", "development") in {"development", "test"}:
+                ordered_keys = [f"case-{i}" for i in range(1, expected + 1)]
+            else:
+                raise StoreError("DATASET_SOURCE_REQUIRED", "This version has no verified source snapshot", 409)
+            expected_keys = set(ordered_keys)
             if any(key not in expected_keys for key in keys):
-                raise StoreError("UNKNOWN_CASE_RESULT", "Result key is not part of this dataset version's positional case set")
+                raise StoreError("UNKNOWN_CASE_RESULT", "Result key is not part of this dataset version's case set")
             if not supplied:
                 if os.getenv("AGENTTEST_SYNTHETIC_MODE") != "1" or os.getenv("APP_ENV") not in {"development", "test"}:
                     raise StoreError("AGENT_EXECUTION_DISABLED", "Supply actual case results; synthetic evaluation requires explicit development/test opt-in", 503)
                 supplied = [
-                    {"case_key": f"case-{i}", "status": "PASS", "score": 1.0, "trace_digest": digest({"case_key": f"case-{i}", "synthetic": True})}
-                    for i in range(1, expected + 1)
+                    {"case_key": key, "status": "PASS", "score": 1.0, "trace_digest": digest({"case_key": key, "synthetic": True})}
+                    for key in ordered_keys
                 ]
                 if grader_sha.endswith("f") and expected >= 2:
                     supplied[1] = {**supplied[1], "status": "FAIL", "score": 0.8}
@@ -238,8 +262,7 @@ class Store:
                     "INSERT INTO idempotency_keys(tenant_id,operation,key,fingerprint,resource_id,created_at) VALUES(?,?,?,?,?,?)",
                     (tenant_id, "evaluation-run", idempotency_key, fingerprint, run_id, created),
                 )
-            for i in range(1, expected + 1):
-                key = f"case-{i}"
+            for key in ordered_keys:
                 item = by_key.get(key)
                 if item is None:
                     status, score, error_code, trace_digest = "MISSING", None, "MISSING_RESULT", digest({"case_key": key, "missing": True})

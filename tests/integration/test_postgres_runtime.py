@@ -18,7 +18,7 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
     root=Path(__file__).resolve().parents[2];other=str(uuid4())
     with psycopg.connect(owner) as db:
         if db.execute("SELECT to_regclass('datasets')").fetchone()[0]:pytest.fail('Proof requires a fresh empty database')
-        for name in ['001_agenttest_mvp.sql','002_agenttest_runtime.sql']:db.execute((root/'migrations/versions'/name).read_text())
+        for name in ['001_agenttest_mvp.sql','002_agenttest_runtime.sql','003_agenttest_dataset_sources.sql']:db.execute((root/'migrations/versions'/name).read_text())
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_agenttest_lab_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
@@ -43,8 +43,10 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
     assert store.member(TENANT,USER) and not store.member(other,USER)
     dataset=store.dataset(TENANT,'Synthetic corpus',USER)
     peers=[PostgresStore(runtime),PostgresStore(runtime)]
+    source='{"case_key":"case-1","input":"synthetic-a","expected":"a"}\n{"case_key":"case-2","input":"synthetic-b","expected":"b"}\n'
+    source_sha=hashlib.sha256(source.encode()).hexdigest()
     with ThreadPoolExecutor(max_workers=4) as pool:
-        versions=list(pool.map(lambda index:peers[index%2].version(TENANT,dataset,'a'*64,2),range(8)))
+        versions=list(pool.map(lambda index:peers[index%2].version(TENANT,dataset,source_sha,2,source_jsonl=source),range(8)))
     with store.conn(TENANT) as db:
         assert sorted(row['version_number'] for row in db.execute('SELECT * FROM versions WHERE dataset_id=?',(dataset,)).fetchall())==list(range(1,9))
         assert db.execute('UPDATE datasets SET name=? WHERE tenant_id=?',('forbidden',other)).rowcount==0
@@ -54,6 +56,16 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
         db.execute('SET LOCAL ROLE fw_agenttest_lab_rw')
         assert db.execute('SELECT count(*) FROM datasets').fetchone()[0]==0
     build=store.build(TENANT,'Synthetic build','b'*64,'c'*64,'prompt-v1')
+    with store.conn(TENANT) as db:
+        assert db.execute('SELECT source_jsonl FROM dataset_sources WHERE version_id=?',(versions[0],)).fetchone()['source_jsonl']==source
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            db.execute('UPDATE dataset_sources SET source_jsonl=? WHERE version_id=?',('tampered',versions[0]))
+    with store.conn(other) as db:
+        assert db.execute('SELECT count(*) FROM dataset_sources').fetchone()[0]==0
+    custom_source='{"case_key":"verified.custom","input":"synthetic","expected":"answer"}\n'
+    custom_version=store.version(TENANT,dataset,hashlib.sha256(custom_source.encode()).hexdigest(),1,source_jsonl=custom_source)
+    custom_run=store.run(TENANT,custom_version,build,'d'*64,results=[{'case_key':'verified.custom','status':'PASS','score':1.0}])
+    assert store.cases(TENANT,custom_run['id'])[0]['case_key']=='verified.custom'
     results=[{'case_key':'case-1','status':'PASS','score':1.0},{'case_key':'case-2','status':'PASS','score':1.0}]
     baseline=store.run(TENANT,versions[0],build,'d'*64,results=results,idempotency_key='baseline-001')
     assert store.run(TENANT,versions[0],build,'d'*64,results=results,idempotency_key='baseline-001')['id']==baseline['id']

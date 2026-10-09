@@ -105,6 +105,10 @@ class PostgresStore(Store):
                 raise ValueError("Tenant group role must be NOLOGIN, NOSUPERUSER and NOBYPASSRLS")
             if not db.execute("SELECT 1 FROM information_schema.columns WHERE table_name='evaluation_runs' AND column_name='grader_config_json'").fetchone():
                 raise ValueError("Apply migration 002 with the migration role before starting runtime")
+            if not db.execute("SELECT 1 FROM information_schema.tables WHERE table_name='dataset_sources'").fetchone():
+                raise ValueError("Apply migration 003 before starting runtime")
+            if db.execute("SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tablename='dataset_sources' AND tableowner IN (current_user, %s)", (ROLE,)).fetchone():
+                raise ValueError("Runtime must not own dataset source tables")
 
     @tenant_method
     def member(self, tenant, user):

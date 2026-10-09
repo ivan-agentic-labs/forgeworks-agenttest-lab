@@ -29,6 +29,7 @@ class Version(BaseModel):
     artifact_id: UUID
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     case_count: int = Field(ge=1, le=1000, strict=True)
+    source_jsonl: str | None = Field(default=None, max_length=1_048_576)
 
 
 class Build(BaseModel):
@@ -145,7 +146,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     @app.post("/v1/datasets/{did}/versions", status_code=201)
     def version(did: UUID, body: Version, c=Depends(scope("dataset:write", store))):
         try:
-            vid = store.version(c["tenant_id"], str(did), body.sha256, body.case_count, str(body.artifact_id))
+            vid = store.version(c["tenant_id"], str(did), body.sha256, body.case_count, str(body.artifact_id), body.source_jsonl)
         except StoreError as error:
             handle_store_error(error)
         with store.conn(c["tenant_id"]) as db:

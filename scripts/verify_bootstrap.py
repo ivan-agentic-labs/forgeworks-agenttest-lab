@@ -22,7 +22,7 @@ for p in root.glob(".github/workflows/*.yml"):
     if data.get("permissions") != {"contents": "read"}:
         errors.append(f"workflow permissions: {p.relative_to(root)}")
 for p in root.glob("migrations/versions/*.sql"):
-    if p.name not in {"001_agenttest_mvp.sql", "002_agenttest_runtime.sql"}:
+    if p.name not in {"001_agenttest_mvp.sql", "002_agenttest_runtime.sql", "003_agenttest_dataset_sources.sql"}:
         errors.append(f"unapproved migration: {p.relative_to(root)}")
 patterns = {
     "private key": r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",

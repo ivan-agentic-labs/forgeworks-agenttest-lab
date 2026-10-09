@@ -1333,6 +1333,10 @@ components:
       - sha256
       - case_count
       properties:
+        source_jsonl:
+          type: string
+          maxLength: 1048576
+          description: Exact UTF-8 JSONL bytes supplied as text, at most 1 MiB. Each row requires case_key, input, expected; digest/count are verified. Required outside explicitly seeded development/test fixtures. artifact_id does not prove an external object was read.
         artifact_id:
           type: string
           format: uuid
