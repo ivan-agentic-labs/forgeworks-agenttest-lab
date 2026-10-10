@@ -370,6 +370,12 @@ export interface components {
             threshold?: number;
             seed?: number;
             seed_source?: string;
+            /**
+             * @description Exact JSON computes grades from verified dataset expected values; external-scores accepts caller grades.
+             * @default external-scores
+             * @enum {string}
+             */
+            mode: "external-scores" | "exact-json-v1";
         } & {
             [key: string]: unknown;
         };
@@ -381,6 +387,8 @@ export interface components {
             /** @description UTF-8 trace with a 1 MiB encoded-byte limit; records must match the result case key. */
             trace_jsonl?: string;
             trace_digest?: string;
+            /** @description JSON output for exact-json-v1. Explicit null is an output; omission is missing. Caller status/score are ignored in exact mode. */
+            observed_output?: unknown;
         };
         ComparisonBinding: {
             /** Format: uuid */

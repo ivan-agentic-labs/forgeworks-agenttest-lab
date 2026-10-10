@@ -11,6 +11,7 @@ from typing import Any, Iterable
 
 from agenttest_lab.domain.trace import validate_and_redact_jsonl
 from agenttest_lab.domain.dataset import parse_dataset
+from agenttest_lab.domain.exact_grader import MODE, GRADER_SHA256, validate_output, grade
 
 TENANT = "00000000-0000-0000-0000-000000000001"
 USER = "00000000-0000-0000-0000-000000000010"
@@ -183,6 +184,20 @@ class Store:
         trace_bytes = sum(len(item["trace_jsonl"].encode("utf-8", errors="surrogatepass")) for item in supplied if isinstance(item, dict) and isinstance(item.get("trace_jsonl"), str))
         if trace_bytes > 4 * 1024 * 1024:
             raise StoreError("EVALUATION_TRACE_BUDGET_EXCEEDED", "Combined traces exceed the 4 MiB evaluation budget")
+        mode = (grader_config or {}).get("mode", "external-scores")
+        if mode not in {"external-scores", MODE}:
+            raise StoreError("INVALID_GRADER_CONFIGURATION", "Unsupported grading mode")
+        if mode == MODE and grader_sha != GRADER_SHA256:
+            raise StoreError("GRADER_IMPLEMENTATION_MISMATCH", "grader_sha256 must identify the installed exact JSON implementation")
+        output_bytes = 0
+        for item in supplied:
+            if "observed_output" in item:
+                try:
+                    output_bytes += len(validate_output(item["observed_output"]))
+                except (ValueError, UnicodeError, RecursionError) as error:
+                    raise StoreError("INVALID_OBSERVED_OUTPUT", str(error)) from error
+        if output_bytes > 4 * 1024 * 1024:
+            raise StoreError("EVALUATION_OUTPUT_BUDGET_EXCEEDED", "Combined outputs exceed 4 MiB")
         fingerprint = digest({
             "version_id": version_id,
             "build_id": build_id,
@@ -235,17 +250,19 @@ class Store:
             source = db.execute("SELECT * FROM dataset_sources WHERE tenant_id=? AND version_id=?", (tenant_id, version_id)).fetchone()
             if source:
                 try:
-                    ordered_keys = [case["case_key"] for case in parse_dataset(source["source_jsonl"], version["sha256"], expected)]
+                    dataset_cases = parse_dataset(source["source_jsonl"], version["sha256"], expected)
+                    ordered_keys = [case["case_key"] for case in dataset_cases]
+                    expected_outputs = {case["case_key"]: case["expected"] for case in dataset_cases}
                 except (ValueError, UnicodeError) as error:
                     raise StoreError("DATASET_SOURCE_INTEGRITY_FAILED", str(error), 409) from error
-            elif getattr(self, "allow_fixture_versions", False) and os.getenv("APP_ENV", "development") in {"development", "test"}:
+            elif mode != MODE and getattr(self, "allow_fixture_versions", False) and os.getenv("APP_ENV", "development") in {"development", "test"}:
                 ordered_keys = [f"case-{i}" for i in range(1, expected + 1)]
             else:
                 raise StoreError("DATASET_SOURCE_REQUIRED", "This version has no verified source snapshot", 409)
             expected_keys = set(ordered_keys)
             if any(key not in expected_keys for key in keys):
                 raise StoreError("UNKNOWN_CASE_RESULT", "Result key is not part of this dataset version's case set")
-            if not supplied:
+            if not supplied and mode != MODE:
                 if os.getenv("AGENTTEST_SYNTHETIC_MODE") != "1" or os.getenv("APP_ENV") not in {"development", "test"}:
                     raise StoreError("AGENT_EXECUTION_DISABLED", "Supply actual case results; synthetic evaluation requires explicit development/test opt-in", 503)
                 supplied = [
@@ -274,14 +291,23 @@ class Store:
                     status = str(item.get("status", item.get("grade_status", "INVALID_RESULT"))).upper()
                     raw_score = item.get("score")
                     valid_score = isinstance(raw_score, (int, float)) and not isinstance(raw_score, bool) and 0 <= float(raw_score) <= 1
-                    if status in {"MISSING", "TIMEOUT"}:
+                    if mode == MODE:
+                        score, error_code = None, None
+                    elif status in {"MISSING", "TIMEOUT"}:
                         score, error_code, complete = None, status, False
                     elif status not in {"PASS", "FAIL"} or not valid_score:
                         status, score, error_code, complete = "INVALID_RESULT", None, "INVALID_RESULT", False
                     else:
                         score, error_code = float(raw_score), None
                         if status != "PASS": complete = False
-                    if status in {"MISSING", "TIMEOUT", "INVALID_RESULT"}:
+                    if mode == MODE:
+                        if "observed_output" not in item:
+                            status, score, error_code = "MISSING", None, "MISSING_OUTPUT"
+                        else:
+                            status, score = grade(expected_outputs[key], item["observed_output"])
+                            error_code = None
+                        # Caller status/score never determines an exact-json grade.
+                    if status != "PASS":
                         complete = False
                     trace_digest = str(item.get("trace_digest") or digest({"case_key": key, "status": status, "score": score}))
                     if item.get("trace_jsonl") is not None:
@@ -291,6 +317,14 @@ class Store:
                                 raise ValueError("TRACE_DIGEST_MISMATCH")
                         except Exception:
                             status, score, error_code, complete = "INVALID_RESULT", None, "INVALID_TRACE", False
+                    if mode == MODE:
+                        # Bind persisted evidence to the dataset and actual output, even
+                        # when a caller also supplies an independently validated trace.
+                        trace_digest = digest({"mode": MODE, "dataset_sha256": version["sha256"], "case_key": key,
+                            "output_present": "observed_output" in item,
+                            "output_sha256": hashlib.sha256(validate_output(item["observed_output"])).hexdigest() if "observed_output" in item else None,
+                            "trace_digest": trace_digest if item.get("trace_jsonl") is not None else None,
+                            "status": status, "score": score})
                 db.execute(
                     "INSERT INTO cases VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (tenant_id, str(uuid.uuid4()), run_id, key, status, score, grader_sha, trace_digest, error_code, created),

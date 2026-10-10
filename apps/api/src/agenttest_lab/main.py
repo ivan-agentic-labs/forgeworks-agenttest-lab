@@ -5,7 +5,7 @@ import os
 import hashlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 import jwt
@@ -43,6 +43,7 @@ class Build(BaseModel):
 class CaseResultInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     case_key: str = Field(min_length=1, max_length=128)
+    observed_output: Any = None
     status: str = "PASS"
     score: float | None = None
     trace_jsonl: str | None = Field(default=None, max_length=1_048_576)
@@ -51,6 +52,7 @@ class CaseResultInput(BaseModel):
 
 class GraderConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
+    mode: Literal["external-scores", "exact-json-v1"] = "external-scores"
     threshold: float = Field(default=0.0, ge=0.0, le=1.0)
     seed: int | None = Field(default=None, ge=-(2**63), le=2**63-1, strict=True)
     seed_source: str | None = Field(default=None, min_length=1)
@@ -194,7 +196,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         if body.seed is not None:
             config["seed"] = body.seed
         try:
-            row = store.run(c["tenant_id"], str(body.dataset_version_id), str(body.agent_build_id), body.grader_sha256, config, [item.model_dump(exclude_none=True) for item in body.case_results] if body.case_results is not None else None, idempotency_key=idempotency_key)
+            row = store.run(c["tenant_id"], str(body.dataset_version_id), str(body.agent_build_id), body.grader_sha256, config, [{**item.model_dump(exclude_none=True), **({"observed_output": item.observed_output} if "observed_output" in item.model_fields_set else {})} for item in body.case_results] if body.case_results is not None else None, idempotency_key=idempotency_key)
         except StoreError as error:
             handle_store_error(error)
         return {"id": row["id"], "status": row["status"], "created_at": row["created_at"], "dataset_version_id": row["version_id"], "agent_build_id": row["build_id"], "grader_sha256": row["grader_sha"], "grader_config_sha256": row["grader_config_sha"], "threshold": row["threshold"], "seed": row["seed"], "seed_source": row["seed_source"], "job_id": row["job_id"]}

@@ -66,6 +66,14 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
     custom_version=store.version(TENANT,dataset,hashlib.sha256(custom_source.encode()).hexdigest(),1,source_jsonl=custom_source)
     custom_run=store.run(TENANT,custom_version,build,'d'*64,results=[{'case_key':'verified.custom','status':'PASS','score':1.0}])
     assert store.cases(TENANT,custom_run['id'])[0]['case_key']=='verified.custom'
+    from agenttest_lab.domain.exact_grader import MODE, GRADER_SHA256
+    exact = store.run(TENANT, custom_version, build, GRADER_SHA256, {'mode': MODE},
+        [{'case_key':'verified.custom', 'observed_output':'wrong', 'status':'PASS', 'score':1.0}])
+    exact_case = store.cases(TENANT, exact['id'])[0]
+    assert exact_case['grade_status'] == 'FAIL' and exact_case['score'] == 0.0
+    exact_pass = store.run(TENANT, custom_version, build, GRADER_SHA256, {'mode': MODE},
+        [{'case_key':'verified.custom', 'observed_output':'answer', 'status':'FAIL', 'score':0.0}])
+    assert exact_pass['status'] == 'SUCCEEDED'
     results=[{'case_key':'case-1','status':'PASS','score':1.0},{'case_key':'case-2','status':'PASS','score':1.0}]
     baseline=store.run(TENANT,versions[0],build,'d'*64,results=results,idempotency_key='baseline-001')
     assert store.run(TENANT,versions[0],build,'d'*64,results=results,idempotency_key='baseline-001')['id']==baseline['id']
