@@ -19,6 +19,9 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
     with psycopg.connect(owner) as db:
         if db.execute("SELECT to_regclass('datasets')").fetchone()[0]:pytest.fail('Proof requires a fresh empty database')
         for name in ['001_agenttest_mvp.sql','002_agenttest_runtime.sql','003_agenttest_dataset_sources.sql']:db.execute((root/'migrations/versions'/name).read_text())
+        db.execute((root/'infra/environments/staging/003_fk_lookup_index.sql').read_text())
+        definition = db.execute("SELECT pg_get_indexdef('idx_evaluation_runs_tenant_dataset_version'::regclass)").fetchone()[0]
+        assert 'evaluation_runs USING btree (tenant_id, dataset_version_id)' in definition
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_agenttest_lab_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
