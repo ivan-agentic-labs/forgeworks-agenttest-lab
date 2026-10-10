@@ -23,6 +23,12 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
         definition = db.execute("SELECT pg_get_indexdef('idx_evaluation_runs_tenant_dataset_version'::regclass)").fetchone()[0]
         assert 'evaluation_runs USING btree (tenant_id, dataset_version_id)' in definition
         db.execute((root/'infra/environments/staging/004_tenant_rls_initplan.sql').read_text())
+        db.execute((root/'infra/environments/staging/005_remaining_tenant_rls_initplans.sql').read_text())
+        for table, policy_name in [['agent_builds','tenant_boundary'],['artifact_exports','tenant_boundary'],['artifacts','tenant_boundary'],['case_results','case_results_tenant'],['comparisons','tenant_boundary'],['dataset_sources','tenant_boundary'],['dataset_versions','tenant_boundary'],['evaluation_runs','evaluation_runs_tenant'],['idempotency_keys','tenant_boundary'],['memberships','tenant_boundary']]:
+            row = db.execute("SELECT qual, with_check, cmd, roles FROM pg_policies WHERE schemaname=current_schema() AND tablename=%s AND policyname=%s", (table, policy_name)).fetchone()
+            assert row and row[2] == 'ALL' and row[3] == ['public']
+            assert all('SELECT current_setting' in clause for clause in row[:2])
+
         policy = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename='datasets' AND policyname='datasets_tenant'").fetchone()
         assert policy and all('SELECT current_setting' in expression for expression in policy)
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
