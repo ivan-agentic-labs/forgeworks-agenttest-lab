@@ -53,3 +53,30 @@ def test_wrong_case_trace_is_rejected():
 def test_multiple_records_for_same_case_remain_supported():
     result = validate_and_redact_jsonl('{"case_key":"case-1","event":"start"}\n{"case_key":"case-1","event":"end"}', expected_case_key="case-1")
     assert result.line_count == 2
+
+
+@pytest.mark.parametrize("case_key", [
+    "contact" + chr(64) + "example.invalid",
+    "case key",
+    "case/key",
+    "case\\\\key",
+    "x" * 129,
+    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature",
+])
+def test_trace_case_identity_cannot_be_rewritten_by_redaction(case_key):
+    source = json.dumps({"case_key": case_key, "event": "synthetic"})
+    with pytest.raises(TraceValidationError) as error:
+        validate_and_redact_jsonl(source)
+    assert error.value.code == "INVALID_CASE_KEY"
+
+
+def test_valid_case_identity_is_preserved_for_dataset_binding():
+    source = json.dumps({"case_key": "batch.2026:case-1", "event": "synthetic"})
+    result = validate_and_redact_jsonl(source, expected_case_key="batch.2026:case-1")
+    assert result.records[0]["case_key"] == "batch.2026:case-1"
+    assert result.redaction_count == 0
+
+
+def test_optional_case_key_still_permits_generic_event_without_identity():
+    result = validate_and_redact_jsonl('{"event":"synthetic"}', require_case_key=False)
+    assert result.records[0] == {"event": "synthetic"}
