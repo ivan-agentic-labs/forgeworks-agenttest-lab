@@ -44,3 +44,19 @@ See `docs/evidence/STAGING_DEPLOYMENT_2026-10-10.json` for deployment IDs, sourc
 ## Additive foreign-key index rollout
 
 After bootstrap, execute `003_fk_lookup_index.sql` using the migration role with `search_path` set to `fw_agenttest_lab, pg_catalog`. Verify `idx_evaluation_runs_tenant_dataset_version` on `evaluation_runs (tenant_id, dataset_version_id)`, rerun the Supabase advisor, and retain rollback: `DROP INDEX IF EXISTS fw_agenttest_lab.idx_evaluation_runs_tenant_dataset_version;` (only after query-plan review). This closes one index finding, **not** a measured application latency requirement.
+
+## Remaining FK index rollout (2026-10-11)
+
+`007_remaining_fk_indexes.sql` adds tenant-prefixed indexes for referencing
+foreign keys not covered by existing primary/unique/lookup indexes. The tables
+in connected staging are small (each below 128 KiB at review). Apply using the
+migration role, the product's private `search_path`, and a single transaction.
+Lock and statement timeouts bound this small-table rollout. For a populated
+production deployment, separately assess write overhead and use a reviewed
+concurrent-index procedure; this staging script is not a production benchmark.
+
+The disposable runtime proof executes the migration twice and verifies exact
+index definitions, followed by the existing business-flow and RLS negatives.
+Do not drop unused indexes merely to remove advisor INFO notices. Rollback is
+limited to the newly named indexes after query-plan review; it requires no
+row, membership, constraint, grant or tenant-policy changes.

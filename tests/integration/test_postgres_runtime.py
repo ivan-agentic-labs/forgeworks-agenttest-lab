@@ -31,6 +31,17 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
 
         policy = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename='datasets' AND policyname='datasets_tenant'").fetchone()
         assert policy and all('SELECT current_setting' in expression for expression in policy)
+        # Run twice to prove replay safety, then inspect actual catalog definitions.
+        for _ in range(2):
+            db.execute((root/'infra/environments/staging/007_remaining_fk_indexes.sql').read_text())
+        definition = db.execute("SELECT pg_get_indexdef('idx_artifact_exports_tenant_artifact'::regclass)").fetchone()[0]
+        assert 'artifact_exports USING btree (tenant_id, artifact_id)' in definition
+        definition = db.execute("SELECT pg_get_indexdef('idx_comparisons_tenant_artifact'::regclass)").fetchone()[0]
+        assert 'comparisons USING btree (tenant_id, artifact_id)' in definition
+        definition = db.execute("SELECT pg_get_indexdef('idx_comparisons_tenant_candidate'::regclass)").fetchone()[0]
+        assert 'comparisons USING btree (tenant_id, candidate_id)' in definition
+        definition = db.execute("SELECT pg_get_indexdef('idx_evaluation_runs_tenant_agent_build'::regclass)").fetchone()[0]
+        assert 'evaluation_runs USING btree (tenant_id, agent_build_id)' in definition
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_agenttest_lab_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
