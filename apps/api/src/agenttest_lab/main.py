@@ -1,5 +1,6 @@
 from __future__ import annotations
 from agenttest_lab.presentation.authentication import decode_bearer, verify_session
+from agenttest_lab.presentation.role_policy import role_scope_allowed
 
 import os
 import hashlib
@@ -103,8 +104,13 @@ def auth(authorization: Annotated[str | None, Header()] = None):
 def scope(required: str, store: Store):
     def dependency(c: dict[str, Any] = Depends(auth)) -> dict[str, Any]:
         verify_session(store, c)
-        if not c.get("tenant_id") or not c.get("sub") or not store.member(str(c["tenant_id"]), str(c["sub"])):
+        if not c.get("tenant_id") or not c.get("sub"):
             reject(403, "TENANT_CONTEXT_INVALID", "Verified membership is required")
+        role = store.member_role(str(c["tenant_id"]), str(c["sub"]))
+        if role is None:
+            reject(403, "TENANT_CONTEXT_INVALID", "Verified membership is required")
+        if not role_scope_allowed(role, required):
+            reject(403, "ROLE_FORBIDDEN", "Membership role cannot perform this operation")
         if required not in set(str(c.get("scope", "")).split()):
             reject(403, "INSUFFICIENT_SCOPE", f"Scope {required} is required")
         return c
