@@ -62,3 +62,6 @@ code { color: var(--accent); }
   .section-heading { align-items: flex-start; flex-direction: column; }
   .section-heading button, .section-heading .pill { align-self: stretch; justify-content: center; }
 }
+
+/* Author layout rules must never override the HTML hidden state. */
+[hidden] { display: none !important; }
