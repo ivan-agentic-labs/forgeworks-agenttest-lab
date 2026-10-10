@@ -27,7 +27,7 @@ def test_json_semantics(expected, observed, matched):
     assert grade(expected, observed) == (('PASS', 1.0) if matched else ('FAIL', 0.0))
 
 
-@pytest.mark.parametrize('output', [float('nan'), float('inf'), '\ud800', {1: 'bad'}, (1,), [0]*20001, 'x'*1048577])
+@pytest.mark.parametrize('output', [float('nan'), float('inf'), '\ud800', {1: 'bad'}, (1,), [0]*20001, 'x'*1048577], ids=['nan','infinity','unpaired-unicode','non-string-key','non-json-tuple','too-many-nodes','too-many-bytes'])
 def test_invalid_output_is_bounded(output):
     with pytest.raises((ValueError, UnicodeError)):
         validate_output(output)
