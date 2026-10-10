@@ -335,6 +335,8 @@ export interface components {
             name: string;
         };
         CreateDatasetVersionRequest: {
+            /** @description Exact UTF-8 JSONL bytes supplied as text, at most 1 MiB. Each row requires case_key, input, expected; digest/count are verified. Required outside explicitly seeded development/test fixtures. artifact_id does not prove an external object was read. */
+            source_jsonl?: string;
             /** Format: uuid */
             artifact_id: string;
             sha256: string;
@@ -355,6 +357,7 @@ export interface components {
             grader_config?: components["schemas"]["GraderConfig"];
             threshold?: number;
             seed?: number;
+            /** @description Unique results for the version's current positional case keys; unknown keys are rejected, missing cases remain partial. */
             case_results?: components["schemas"]["CaseResultInput"][];
         };
         CreateComparisonRequest: {
@@ -375,6 +378,7 @@ export interface components {
             /** @enum {string} */
             status?: "PASS" | "FAIL" | "MISSING" | "TIMEOUT" | "INVALID_RESULT";
             score?: number | null;
+            /** @description UTF-8 trace with a 1 MiB encoded-byte limit; records must match the result case key. */
             trace_jsonl?: string;
             trace_digest?: string;
         };
