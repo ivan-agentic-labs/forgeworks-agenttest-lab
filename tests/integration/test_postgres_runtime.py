@@ -74,6 +74,10 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
     exact_pass = store.run(TENANT, custom_version, build, GRADER_SHA256, {'mode': MODE},
         [{'case_key':'verified.custom', 'observed_output':'answer', 'status':'FAIL', 'score':0.0}])
     assert exact_pass['status'] == 'SUCCEEDED'
+    with pytest.raises(StoreError) as mismatch:
+        store.compare(TENANT, custom_run['id'], exact_pass['id'], 'mixed-grading-policy')
+    assert mismatch.value.code == 'GRADING_MODE_MISMATCH'
+    assert store.compare(TENANT, exact['id'], exact_pass['id'], 'computed-grading-policy')['verdict'] == 'FAIL'
     results=[{'case_key':'case-1','status':'PASS','score':1.0},{'case_key':'case-2','status':'PASS','score':1.0}]
     baseline=store.run(TENANT,versions[0],build,'d'*64,results=results,idempotency_key='baseline-001')
     assert store.run(TENANT,versions[0],build,'d'*64,results=results,idempotency_key='baseline-001')['id']==baseline['id']

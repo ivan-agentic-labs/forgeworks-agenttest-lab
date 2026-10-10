@@ -348,6 +348,12 @@ class Store:
             raise StoreError("RESOURCE_NOT_FOUND", "Baseline or candidate run is not visible", 404)
         if baseline["version_id"] != candidate["version_id"]:
             raise StoreError("DATASET_VERSION_MISMATCH", "Baseline and candidate must use the same immutable dataset version", 409)
+        base_mode = json.loads(baseline["grader_config_json"]).get("mode", "external-scores")
+        candidate_mode = json.loads(candidate["grader_config_json"]).get("mode", "external-scores")
+        if base_mode != candidate_mode:
+            raise StoreError("GRADING_MODE_MISMATCH", "Computed grades cannot be compared with caller-supplied scores", 409)
+        if base_mode == MODE and baseline["grader_sha"] != candidate["grader_sha"]:
+            raise StoreError("GRADER_IMPLEMENTATION_MISMATCH", "Exact JSON comparisons require the same grader implementation", 409)
         effective_threshold = float(threshold if threshold is not None else max(float(baseline["threshold"] or 0), float(candidate["threshold"] or 0)))
         fingerprint = digest({"candidate_id": candidate_id, "baseline_id": baseline_id, "policy": policy, "threshold": effective_threshold})
         with self.conn() as db:

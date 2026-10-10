@@ -131,3 +131,28 @@ def test_grader_sha_tracks_implementation():
     from pathlib import Path
     import agenttest_lab.domain.exact_grader as module
     assert GRADER_SHA256 == hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize('reverse', [False, True])
+def test_external_scores_cannot_pass_against_computed_baseline(tmp_path, reverse):
+    store, version, build = setup(tmp_path, 1)
+    exact = store.run(TENANT, version, build, GRADER_SHA256, {'mode':MODE}, [{'case_key':'actual','observed_output':1}])
+    external = store.run(TENANT, version, build, 'd'*64, results=[{'case_key':'actual','status':'PASS','score':1}])
+    candidate, baseline = (exact, external) if reverse else (external, exact)
+    with pytest.raises(StoreError) as error:
+        store.compare(TENANT, candidate['id'], baseline['id'], 'computed-policy')
+    assert error.value.code == 'GRADING_MODE_MISMATCH'
+    with store.conn() as db: assert db.execute('SELECT count(*) FROM comparisons').fetchone()[0] == 0
+
+
+def test_exact_comparison_rejects_changed_implementation(tmp_path):
+    store, version, build = setup(tmp_path, 1)
+    results = [{'case_key':'actual','observed_output':1}]
+    baseline = store.run(TENANT, version, build, GRADER_SHA256, {'mode':MODE}, results)
+    candidate = store.run(TENANT, version, build, GRADER_SHA256, {'mode':MODE}, results)
+    # Model an immutable run produced by an older deployed grader revision.
+    with store.conn() as db:
+        db.execute('UPDATE runs SET grader_sha=? WHERE tenant_id=? AND id=?', ('d'*64,TENANT,baseline['id']))
+    with pytest.raises(StoreError) as error:
+        store.compare(TENANT,candidate['id'],baseline['id'],'computed-policy')
+    assert error.value.code == 'GRADER_IMPLEMENTATION_MISMATCH'

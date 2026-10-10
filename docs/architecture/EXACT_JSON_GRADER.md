@@ -8,6 +8,8 @@ Object key order is ignored, array order is significant, JSON numbers compare nu
 
 Persisted result evidence hashes bind the case, immutable dataset hash, actual output hash, calculated grade, and validated trace hash if present. Raw output is not newly stored. A hash is not encryption; low-entropy values can still be guessed. The trace_digest field contains this combined grading evidence hash in exact mode, rather than only the trace hash. A supplied trace_digest is verified against trace_jsonl before combination; a caller digest without trace bytes is not used as evidence in this mode.
 
+Comparisons require the same grading mode. Exact JSON comparisons also require the same grader implementation hash; changing the implementation requires a freshly graded baseline. This prevents caller-supplied scores from passing against a server-graded baseline.
+
 The default `external-scores` mode preserves existing integrations that submit externally calculated grades. This mode does not validate their grader computation. Metadata-only fixture versions and synthetic result fallback are never accepted for exact grading.
 
 This feature grades caller-recorded outputs. It does not prove an agent actually generated them, connect to an agent provider, or establish that the reference dataset is objectively correct. Build and dataset provenance still need independent ownership controls. Live isolated agent execution remains a separate unfinished integration.
