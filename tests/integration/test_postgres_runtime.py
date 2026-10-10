@@ -22,6 +22,9 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
         db.execute((root/'infra/environments/staging/003_fk_lookup_index.sql').read_text())
         definition = db.execute("SELECT pg_get_indexdef('idx_evaluation_runs_tenant_dataset_version'::regclass)").fetchone()[0]
         assert 'evaluation_runs USING btree (tenant_id, dataset_version_id)' in definition
+        db.execute((root/'infra/environments/staging/004_tenant_rls_initplan.sql').read_text())
+        policy = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename='datasets' AND policyname='datasets_tenant'").fetchone()
+        assert policy and all('SELECT current_setting' in expression for expression in policy)
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_agenttest_lab_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
