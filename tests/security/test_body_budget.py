@@ -46,3 +46,35 @@ def test_disconnect_does_not_invoke_application():
         async def app(scope, receive, send): raise AssertionError('Disconnected client')
         await BodyBudgetMiddleware(app)({'type':'http'}, receive, send)
     asyncio.run(scenario())
+
+
+def test_declared_length_and_pathological_headers_fail_closed():
+    async def scenario(header):
+        sent = []
+        async def app(scope, receive, send):
+            raise AssertionError("Application must not run")
+        async def receive():
+            raise AssertionError("Oversized declared body should be rejected early")
+        async def send(message):
+            sent.append(message)
+        scope = {"type": "http", "method": "POST", "headers": [header]}
+        await BodyBudgetMiddleware(app, max_bytes=5)(scope, receive, send)
+        return next(x["status"] for x in sent if x["type"] == "http.response.start")
+    assert asyncio.run(scenario((b"content-length", b"6"))) == 413
+    assert asyncio.run(scenario((b"content-length", b"9" * 5000))) == 400
+
+
+def test_empty_chunk_flood_is_bounded():
+    async def scenario():
+        called, sent = [], []
+        async def app(scope, receive, send):
+            called.append(True)
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": True}
+        async def send(message):
+            sent.append(message)
+        await BodyBudgetMiddleware(app, max_bytes=10, max_chunks=3)(
+            {"type": "http", "headers": []}, receive, send)
+        assert called == []
+        assert next(x["status"] for x in sent if x["type"] == "http.response.start") == 413
+    asyncio.run(scenario())
