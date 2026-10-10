@@ -1456,6 +1456,8 @@ components:
           - 'null'
         trace_jsonl:
           type: string
+          maxLength: 1048576
+          description: UTF-8 trace with a 1 MiB encoded-byte limit; records must match the result case key.
         trace_digest:
           type: string
           pattern: ^[0-9a-f]{64}$

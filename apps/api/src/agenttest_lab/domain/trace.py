@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 import re
 from typing import Any
 
@@ -80,32 +81,70 @@ def redact_trace_value(value: Any, *, _sensitive: bool = False) -> tuple[Any, in
     return value, 0
 
 
-def validate_and_redact_jsonl(content: str | bytes, *, require_case_key: bool = True) -> TraceValidationResult:
+def validate_and_redact_jsonl(content: str | bytes, *, require_case_key: bool = True, expected_case_key: str | None = None) -> TraceValidationResult:
     """Parse JSONL, enforce data-only object records, redact, and hash the result.
 
     Blank lines are ignored. Every nonblank line must be a JSON object. A case_key is
     required by default so traces cannot be detached from a dataset case. No code is
     executed and no original unredacted representation is retained in the result.
     """
-    if isinstance(content, bytes):
-        content = content.decode("utf-8", errors="strict")
-    if not isinstance(content, str):
+    if not isinstance(content, (str, bytes)):
         raise TypeError("content must be str or UTF-8 bytes")
+    if len(content) > 1_048_576:
+        raise TraceValidationError(1, "TRACE_BUDGET_EXCEEDED", "trace exceeds 1 MiB")
+    try:
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="strict")
+        if len(content.encode("utf-8", errors="strict")) > 1_048_576:
+            raise TraceValidationError(1, "TRACE_BUDGET_EXCEEDED", "trace exceeds 1 MiB")
+    except UnicodeError as error:
+        raise TraceValidationError(1, "INVALID_UNICODE", "trace must be valid UTF-8") from error
 
+    nodes = 0
     records: list[dict[str, Any]] = []
     redacted_lines: list[str] = []
     redactions = 0
     for line_number, raw_line in enumerate(content.splitlines(), start=1):
         if not raw_line.strip():
             continue
+        if len(records) >= 1000:
+            raise TraceValidationError(line_number, "TRACE_RECORD_BUDGET_EXCEEDED", "trace exceeds 1000 records")
+        def unique(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise TraceValidationError(line_number, "DUPLICATE_JSON_KEY", "duplicate JSON keys are forbidden")
+                result[key] = value
+            return result
+        def constant(_):
+            raise TraceValidationError(line_number, "NONFINITE_NUMBER", "trace numbers must be finite")
         try:
-            parsed = json.loads(raw_line)
-        except json.JSONDecodeError as exc:
-            raise TraceValidationError(line_number, "INVALID_JSON", exc.msg) from exc
+            parsed = json.loads(raw_line, object_pairs_hook=unique, parse_constant=constant)
+        except TraceValidationError:
+            raise
+        except (ValueError, RecursionError) as exc:
+            raise TraceValidationError(line_number, "INVALID_JSON", "record is invalid or excessively nested JSON") from exc
+        pending = [(parsed, 0)]
+        while pending:
+            value, depth = pending.pop()
+            nodes += 1
+            if nodes > 20000 or depth > 32:
+                raise TraceValidationError(line_number, "TRACE_STRUCTURE_BUDGET_EXCEEDED", "trace exceeds structural limits")
+            if isinstance(value, dict):
+                pending.extend((key, depth + 1) for key in value)
+                pending.extend((item, depth + 1) for item in value.values())
+            elif isinstance(value, list):
+                pending.extend((item, depth + 1) for item in value)
+            elif isinstance(value, float) and not math.isfinite(value):
+                raise TraceValidationError(line_number, "NONFINITE_NUMBER", "trace numbers must be finite")
+            elif isinstance(value, str) and any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+                raise TraceValidationError(line_number, "INVALID_UNICODE", "unpaired Unicode surrogates are forbidden")
         if not isinstance(parsed, dict):
             raise TraceValidationError(line_number, "INVALID_RECORD", "each JSONL record must be an object")
         if require_case_key and (not isinstance(parsed.get("case_key"), str) or not parsed["case_key"].strip()):
             raise TraceValidationError(line_number, "MISSING_CASE_KEY", "case_key must be a non-empty string")
+        if expected_case_key is not None and parsed.get("case_key") != expected_case_key:
+            raise TraceValidationError(line_number, "TRACE_CASE_BINDING_MISMATCH", "trace record belongs to another case")
         redacted, count = redact_trace_value(parsed)
         assert isinstance(redacted, dict)
         records.append(redacted)

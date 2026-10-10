@@ -180,6 +180,9 @@ class Store:
             raise StoreError("INVALID_CASE_BINDING", "Each result requires a bounded string case key")
         if len(set(keys)) != len(keys):
             raise StoreError("DUPLICATE_CASE_RESULT", "Duplicate case results cannot overwrite evaluation evidence")
+        trace_bytes = sum(len(item["trace_jsonl"].encode("utf-8", errors="surrogatepass")) for item in supplied if isinstance(item, dict) and isinstance(item.get("trace_jsonl"), str))
+        if trace_bytes > 4 * 1024 * 1024:
+            raise StoreError("EVALUATION_TRACE_BUDGET_EXCEEDED", "Combined traces exceed the 4 MiB evaluation budget")
         fingerprint = digest({
             "version_id": version_id,
             "build_id": build_id,
@@ -283,7 +286,9 @@ class Store:
                     trace_digest = str(item.get("trace_digest") or digest({"case_key": key, "status": status, "score": score}))
                     if item.get("trace_jsonl") is not None:
                         try:
-                            trace_digest = validate_and_redact_jsonl(item["trace_jsonl"]).sha256
+                            trace_digest = validate_and_redact_jsonl(item["trace_jsonl"], expected_case_key=key).sha256
+                            if item.get("trace_digest") is not None and item["trace_digest"] != trace_digest:
+                                raise ValueError("TRACE_DIGEST_MISMATCH")
                         except Exception:
                             status, score, error_code, complete = "INVALID_RESULT", None, "INVALID_TRACE", False
                 db.execute(

@@ -45,7 +45,7 @@ class CaseResultInput(BaseModel):
     case_key: str = Field(min_length=1, max_length=128)
     status: str = "PASS"
     score: float | None = None
-    trace_jsonl: str | None = None
+    trace_jsonl: str | None = Field(default=None, max_length=1_048_576)
     trace_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
@@ -129,6 +129,8 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     if seed:
         store.seed()
     app = FastAPI(title="AgentTest Lab MVP", version="0.2.0")
+    from agenttest_lab.presentation.body_budget import BodyBudgetMiddleware
+    app.add_middleware(BodyBudgetMiddleware)
     app.state.store = store
     objects = None
     if os.getenv("S3_ENDPOINT"):

@@ -1,0 +1,7 @@
+# Trace provenance and offline CI gate — 2026-10-11
+
+Trace records are now bound to the evaluated case key. Duplicate JSON keys, non-finite numbers (including exponent overflow), invalid Unicode, oversized input, excessive records/nodes/depth and wrong-case trace records are rejected. A supplied digest must match the redacted trace digest. Invalid traces yield `INVALID_RESULT`/`INVALID_TRACE` and cannot make a run succeed. Limits: 1 MiB/1000 records/20000 nodes/depth 32 per trace, 4 MiB combined traces per evaluation, and 8 MiB actual HTTP request bytes checked before JSON deserialization, including chunked requests. Redaction remains a heuristic rather than a guarantee of complete PII removal.
+
+The new offline verifier validates the exact Ed25519 signed payload, its SHA-256, the trusted public-key fingerprint and independently pinned dataset/build/run/grader/policy/threshold binding. It rejects altered envelopes, wrong keys, replay against another binding, malformed/non-finite JSON, inconsistent PASS/missing-case/delta claims and oversized files. It never accepts a public key from the received envelope. Signature verification authenticates the producer; it does not independently prove grader correctness or real agent execution.
+
+Local command: `python -W error -m pytest tests -q`: 212 passed, 1 skipped (PostgreSQL). The exact commit's application and disposable PostgreSQL workflows provide CI evidence. Remote agent execution, LLM judging, human-adjudicated corpus and a live external GitHub check-run remain open.

@@ -165,3 +165,35 @@ def test_unverified_external_artifacts_remain_quarantined(tmp_path):
         committed=client.post(f'/v1/artifacts/{aid}/commit',headers=headers('artifact:commit'),json={'size_bytes':2,'sha256':'a'*64,'object_generation':'declared-not-verified'})
         assert committed.status_code==200 and committed.json()['status']=='QUARANTINED'
         assert client.post(f'/v1/artifacts/{aid}/download-intents',headers=headers('artifact:download')).status_code==409
+
+
+import pytest
+
+@pytest.mark.parametrize("trace,expected_digest", [
+    ('{"case_key":"case-2","event":"done"}', None),
+    ('{"case_key":"case-1","case_key":"case-2"}', None),
+    ('{"case_key":"case-1","score":NaN}', None),
+    ('{"case_key":"case-1","event":"done"}', "a" * 64),
+])
+def test_invalid_trace_cannot_produce_a_passing_evaluation(tmp_path, trace, expected_digest):
+    with TestClient(create_app(str(tmp_path / "db.sqlite"), seed=True)) as client:
+        version, build = _resources(client)
+        result = {"case_key": "case-1", "status": "PASS", "score": 1.0, "trace_jsonl": trace}
+        if expected_digest: result["trace_digest"] = expected_digest
+        response = client.post("/v1/evaluation-runs", headers=headers("evaluation:run"), json={"dataset_version_id": version, "agent_build_id": build, "grader_sha256": "d" * 64, "case_results": [result, {"case_key": "case-2", "status": "PASS", "score": 1.0}]})
+        assert response.status_code == 202
+        assert response.json()["status"] == "PARTIAL"
+        cases = client.get(f"/v1/evaluation-runs/{response.json()['id']}/cases", headers=headers("evaluation:read")).json()["items"]
+        assert cases[0]["grade_status"] == "INVALID_RESULT"
+        assert cases[0]["error_code"] == "INVALID_TRACE"
+        assert cases[0]["score"] is None
+
+
+def test_aggregate_trace_budget_is_enforced_before_evaluation(tmp_path):
+    import json
+    with TestClient(create_app(str(tmp_path / "trace-budget.sqlite"), seed=True)) as client:
+        version, build = _resources(client)
+        results = [{"case_key": f"case-{i}", "status": "PASS", "score": 1.0, "trace_jsonl": json.dumps({"case_key": f"case-{i}", "output": "x" * 900_000})} for i in range(1, 6)]
+        response = client.post("/v1/evaluation-runs", headers=headers("evaluation:run"), json={"dataset_version_id": version, "agent_build_id": build, "grader_sha256": "d" * 64, "case_results": results})
+        assert response.status_code >= 400
+        assert response.json()["code"] == "EVALUATION_TRACE_BUDGET_EXCEEDED"

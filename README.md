@@ -48,3 +48,7 @@ See [current changes and residual gaps](docs/evidence/ENGINEERING_CONTINUATION.m
 ## Current main engineering status
 
 See [current G1/G2 evidence](docs/verification/CURRENT_GATE_EVIDENCE.md), [exact source receipt](docs/evidence/MAIN_VERIFICATION_2026-10-09.json), and [owner main authorization](docs/governance/ENGINEERING_MAIN_AUTHORIZATION_2026-10-09.md). PostgreSQL adapters exist for all five independent projects. Historical evidence retains its source SHA and narrower scope.
+
+## Offline CI gate
+
+[Verify signed CI verdicts](docs/architecture/OFFLINE_CI_VERDICT.md) using a trusted Ed25519 public key and independently pinned evaluation bindings. Trace provenance checks and bounded parsing are documented in [the latest evidence](docs/evidence/TRACE_AND_CI_GATE_2026-10-11.md).
