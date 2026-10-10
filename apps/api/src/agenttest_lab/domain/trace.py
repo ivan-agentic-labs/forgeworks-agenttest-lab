@@ -141,9 +141,18 @@ def validate_and_redact_jsonl(content: str | bytes, *, require_case_key: bool = 
                 raise TraceValidationError(line_number, "INVALID_UNICODE", "unpaired Unicode surrogates are forbidden")
         if not isinstance(parsed, dict):
             raise TraceValidationError(line_number, "INVALID_RECORD", "each JSONL record must be an object")
-        if require_case_key and (not isinstance(parsed.get("case_key"), str) or not parsed["case_key"].strip()):
+        case_key = parsed.get("case_key")
+        if require_case_key and (not isinstance(case_key, str) or not case_key.strip()):
             raise TraceValidationError(line_number, "MISSING_CASE_KEY", "case_key must be a non-empty string")
-        if expected_case_key is not None and parsed.get("case_key") != expected_case_key:
+        # The dataset parser uses this exact identity profile. Reject PII,
+        # whitespace and oversized identities before redaction could alter the
+        # key used to bind a trace to its dataset case.
+        if case_key is not None and (
+            not isinstance(case_key, str)
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", case_key) is None
+        ):
+            raise TraceValidationError(line_number, "INVALID_CASE_KEY", "case_key must match the dataset identity profile")
+        if expected_case_key is not None and case_key != expected_case_key:
             raise TraceValidationError(line_number, "TRACE_CASE_BINDING_MISMATCH", "trace record belongs to another case")
         redacted, count = redact_trace_value(parsed)
         assert isinstance(redacted, dict)
