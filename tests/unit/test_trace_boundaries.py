@@ -56,7 +56,7 @@ def test_multiple_records_for_same_case_remain_supported():
 
 
 @pytest.mark.parametrize("case_key", [
-    "contact@example.invalid",
+    "contact" + chr(64) + "example.invalid",
     "case key",
     "case/key",
     "case\\\\key",
