@@ -306,7 +306,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
                 reject(409, "ARTIFACT_BYTES_UNAVAILABLE", "Persisted artifact bytes are unavailable")
             objects.read(c["tenant_id"], str(artifact_id), row["object_generation"], row["sha256"], row["size_bytes"])
         from agenttest_lab.infrastructure.artifact_downloads import issue_download
-        token, expiry = issue_download(c["tenant_id"], c["sub"], str(artifact_id), row["sha256"])
+        token, expiry = issue_download(c["tenant_id"], c["sub"], str(artifact_id), row["sha256"], session_id=c.get("session_id"))
         return {"artifact_id": row["id"], "download_url": f"/v1/artifact-transfers/{row['id']}?token={token}", "expires_at": datetime.fromtimestamp(expiry,timezone.utc).isoformat().replace("+00:00", "Z"), "object_generation": row["object_generation"]}
 
     @app.put("/v1/artifact-transfers/{artifact_id}", status_code=201)
@@ -339,7 +339,7 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     @app.get("/v1/artifact-transfers/{artifact_id}")
     def transfer_artifact(artifact_id: UUID, token: str):
         from agenttest_lab.infrastructure.artifact_downloads import verify_download
-        claims = verify_download(token, str(artifact_id))
+        claims = verify_download(token, str(artifact_id), store)
         if not store.member(claims["tenant_id"], claims["actor"]):
             raise HTTPException(status_code=403, detail={"code":"MEMBERSHIP_REVOKED", "detail":"Artifact capability owner is no longer an active member"})
         export = store.export(claims["tenant_id"], str(artifact_id))
