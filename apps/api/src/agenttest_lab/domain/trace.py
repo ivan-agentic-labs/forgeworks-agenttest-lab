@@ -24,7 +24,8 @@ _SENSITIVE_KEY = re.compile(
 _PII_KEY = re.compile(
     r"(?:^|[_-])(?:ssn|social[_-]?security(?:[_-]?(?:number|id))?|national[_-]?id|"
     r"phone(?:[_-]?number)?|mobile(?:[_-]?number)?|email(?:[_-]?address)?|"
-    r"date[_-]?of[_-]?birth|dob|passport(?:[_-]?(?:number|no))?|"\n    r"ip[_-]?address|(?:client|customer|source|remote|user)[_-]?ip)(?:$|[_-])",
+    r"date[_-]?of[_-]?birth|dob|passport(?:[_-]?(?:number|no))?|"
+    r"ip[_-]?address|(?:client|customer|source|remote|user)[_-]?ip)(?:$|[_-])",
     re.IGNORECASE,
 )
 _EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
