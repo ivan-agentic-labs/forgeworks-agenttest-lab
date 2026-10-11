@@ -17,6 +17,16 @@ _SENSITIVE_KEY = re.compile(
     r"(?:pass(?:word|phrase)?|secret|token|api[_-]?key|authorization|cookie|credential|private[_-]?key|access[_-]?key|refresh[_-]?token)",
     re.IGNORECASE,
 )
+# PII may be an opaque value (for example a numeric identifier) that cannot
+# be discovered safely with a regex over the value itself. Redact structured
+# PII field names at any nesting level without treating every numeric trace
+# field as sensitive.
+_PII_KEY = re.compile(
+    r"(?:^|[_-])(?:ssn|social[_-]?security(?:[_-]?(?:number|id))?|national[_-]?id|"
+    r"phone(?:[_-]?number)?|mobile(?:[_-]?number)?|email(?:[_-]?address)?|"
+    r"date[_-]?of[_-]?birth|dob|passport(?:[_-]?(?:number|no))?)(?:$|[_-])",
+    re.IGNORECASE,
+)
 _EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 _BEARER = re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE)
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
@@ -64,7 +74,7 @@ def redact_trace_value(value: Any, *, _sensitive: bool = False) -> tuple[Any, in
         count = 0
         for key, item in value.items():
             key_text = str(key)
-            clean, changed = redact_trace_value(item, _sensitive=bool(_SENSITIVE_KEY.search(key_text)))
+            clean, changed = redact_trace_value(item, _sensitive=bool(_SENSITIVE_KEY.search(key_text) or _PII_KEY.search(key_text)))
             out[key_text] = clean
             count += changed
         return out, count

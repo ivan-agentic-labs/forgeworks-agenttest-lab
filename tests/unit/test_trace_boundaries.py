@@ -80,3 +80,45 @@ def test_valid_case_identity_is_preserved_for_dataset_binding():
 def test_optional_case_key_still_permits_generic_event_without_identity():
     result = validate_and_redact_jsonl('{"event":"synthetic"}', require_case_key=False)
     assert result.records[0] == {"event": "synthetic"}
+
+
+def test_nested_structured_pii_fields_are_redacted_before_hashing():
+    private_email = "synthetic" + chr(64) + "example.invalid"
+    source = json.dumps({
+        "case_key": "case-1",
+        "metadata": {
+            "customer_phone_number": "+628123456789",
+            "national_id": 123456789,
+            "date_of_birth": "2001-01-02",
+            "email_address": private_email,
+            "microphone_level": 0.5,
+        },
+        "event": "completed",
+    })
+    result = validate_and_redact_jsonl(source, expected_case_key="case-1")
+    record = result.records[0]
+    metadata = record["metadata"]
+    assert record["case_key"] == "case-1"
+    assert record["event"] == "completed"
+    for key in ("customer_phone_number", "national_id", "date_of_birth", "email_address"):
+        assert metadata[key] == "[REDACTED]"
+    assert metadata["microphone_level"] == 0.5
+    assert result.redaction_count == 4
+    for secret in ("+628123456789", "123456789", "2001-01-02", private_email):
+        assert secret not in result.redacted_jsonl
+    import hashlib
+    assert result.sha256 == hashlib.sha256(result.redacted_jsonl.encode("utf-8")).hexdigest()
+
+
+@pytest.mark.parametrize("field", [
+    "ssn",
+    "passport_number",
+    "mobile_number",
+    "contact-email",
+    "billing_phone",
+])
+def test_structured_pii_key_is_redacted_even_if_value_has_no_known_pattern(field):
+    source = json.dumps({"case_key": "case-1", "attributes": {field: "opaquevalue123"}})
+    result = validate_and_redact_jsonl(source)
+    assert result.records[0]["attributes"][field] == "[REDACTED]"
+    assert "opaquevalue123" not in result.redacted_jsonl
