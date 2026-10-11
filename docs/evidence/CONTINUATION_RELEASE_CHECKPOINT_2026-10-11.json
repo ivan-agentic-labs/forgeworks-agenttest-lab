@@ -1,0 +1,260 @@
+{
+  "recorded_date": "2026-10-11",
+  "production_ready": false,
+  "railway": {
+    "project": {
+      "id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
+      "name": "ForgeWorks AI staging"
+    },
+    "environment": {
+      "id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
+      "name": "staging"
+    },
+    "staged": {
+      "patchId": "d7e9d350-5dae-4464-9869-e4103521ce0b",
+      "status": "STAGED",
+      "changeCount": 17,
+      "message": null,
+      "createdAt": "2026-10-10T23:58:28.530Z",
+      "updatedAt": "2026-10-11T02:03:45.598Z"
+    },
+    "destructive": false,
+    "resources": [
+      {
+        "kind": "service",
+        "id": "16693650-fec8-48e4-b934-e032dd391808",
+        "name": "accessfix-ai",
+        "action": "update",
+        "changes": [
+          {
+            "path": "services.16693650-fec8-48e4-b934-e032dd391808.source.commitSha",
+            "displayName": "Commit Sha",
+            "type": "updated",
+            "from": "c396da079a707b3b2a5ad46de7579cc6594ced60",
+            "to": "087aa38071c71cde57532d1ae001c3a4ba120d36",
+            "destructive": false
+          }
+        ]
+      },
+      {
+        "kind": "service",
+        "id": "34688a14-872b-43a5-ab5b-8d2e488c7b5f",
+        "name": "datareconcile-ai",
+        "action": "update",
+        "changes": [
+          {
+            "path": "services.34688a14-872b-43a5-ab5b-8d2e488c7b5f.source.branch",
+            "displayName": "Branch",
+            "type": "updated",
+            "from": "main",
+            "to": "main",
+            "destructive": false
+          },
+          {
+            "path": "services.34688a14-872b-43a5-ab5b-8d2e488c7b5f.source.commitSha",
+            "displayName": "Commit Sha",
+            "type": "updated",
+            "from": "5c679ac742a2ed631464cadcf90e1adb10d3b086",
+            "to": "eaedd5fb2b13225d11a45c37432ba00891b3902d",
+            "destructive": false
+          },
+          {
+            "path": "services.34688a14-872b-43a5-ab5b-8d2e488c7b5f.source.image",
+            "displayName": "Image",
+            "type": "removed",
+            "from": "",
+            "to": "",
+            "destructive": false
+          },
+          {
+            "path": "services.34688a14-872b-43a5-ab5b-8d2e488c7b5f.source.repo",
+            "displayName": "Repo",
+            "type": "updated",
+            "from": "ivan-agentic-labs/forgeworks-datareconcile-ai",
+            "to": "ivan-agentic-labs/forgeworks-datareconcile-ai",
+            "destructive": false
+          }
+        ]
+      },
+      {
+        "kind": "service",
+        "id": "57d8f010-e38e-4dbe-94bb-05cc5d855229",
+        "name": "apishield-agent",
+        "action": "update",
+        "changes": [
+          {
+            "path": "services.57d8f010-e38e-4dbe-94bb-05cc5d855229.source.branch",
+            "displayName": "Branch",
+            "type": "updated",
+            "from": "main",
+            "to": "main",
+            "destructive": false
+          },
+          {
+            "path": "services.57d8f010-e38e-4dbe-94bb-05cc5d855229.source.commitSha",
+            "displayName": "Commit Sha",
+            "type": "updated",
+            "from": "7508a6f26fbf2cd04a8c9ca6b8f5fc7b0ef5fd7b",
+            "to": "5a6ad54e799715c27bc3c7ff7abe4ad7fae7fa4e",
+            "destructive": false
+          },
+          {
+            "path": "services.57d8f010-e38e-4dbe-94bb-05cc5d855229.source.image",
+            "displayName": "Image",
+            "type": "removed",
+            "from": "",
+            "to": "",
+            "destructive": false
+          },
+          {
+            "path": "services.57d8f010-e38e-4dbe-94bb-05cc5d855229.source.repo",
+            "displayName": "Repo",
+            "type": "updated",
+            "from": "ivan-agentic-labs/forgeworks-apishield-agent",
+            "to": "ivan-agentic-labs/forgeworks-apishield-agent",
+            "destructive": false
+          }
+        ]
+      },
+      {
+        "kind": "service",
+        "id": "db8b6012-8d48-4cd0-802c-225db1b0a19e",
+        "name": "specforge-ai",
+        "action": "update",
+        "changes": [
+          {
+            "path": "services.db8b6012-8d48-4cd0-802c-225db1b0a19e.source.branch",
+            "displayName": "Branch",
+            "type": "updated",
+            "from": "main",
+            "to": "main",
+            "destructive": false
+          },
+          {
+            "path": "services.db8b6012-8d48-4cd0-802c-225db1b0a19e.source.commitSha",
+            "displayName": "Commit Sha",
+            "type": "updated",
+            "from": "41d2b8abbefe82a5d5c502d7339cbed71c4b5f5f",
+            "to": "f521c2c3f3b6573b4d390d9f309b077d1d6d6732",
+            "destructive": false
+          },
+          {
+            "path": "services.db8b6012-8d48-4cd0-802c-225db1b0a19e.source.image",
+            "displayName": "Image",
+            "type": "removed",
+            "from": "",
+            "to": "",
+            "destructive": false
+          },
+          {
+            "path": "services.db8b6012-8d48-4cd0-802c-225db1b0a19e.source.repo",
+            "displayName": "Repo",
+            "type": "updated",
+            "from": "ivan-agentic-labs/forgeworks-specforge-ai",
+            "to": "ivan-agentic-labs/forgeworks-specforge-ai",
+            "destructive": false
+          }
+        ]
+      },
+      {
+        "kind": "service",
+        "id": "f2d6c578-ffaf-4682-b81a-8bae13d9c7a3",
+        "name": "agenttest-lab",
+        "action": "update",
+        "changes": [
+          {
+            "path": "services.f2d6c578-ffaf-4682-b81a-8bae13d9c7a3.source.branch",
+            "displayName": "Branch",
+            "type": "updated",
+            "from": "main",
+            "to": "main",
+            "destructive": false
+          },
+          {
+            "path": "services.f2d6c578-ffaf-4682-b81a-8bae13d9c7a3.source.commitSha",
+            "displayName": "Commit Sha",
+            "type": "updated",
+            "from": "2e6ba172855dc367750e4aa2a2ab55b0e9c1ebbf",
+            "to": "7fa72024bd4c761590b5474f5453697d4007e711",
+            "destructive": false
+          },
+          {
+            "path": "services.f2d6c578-ffaf-4682-b81a-8bae13d9c7a3.source.image",
+            "displayName": "Image",
+            "type": "removed",
+            "from": "",
+            "to": "",
+            "destructive": false
+          },
+          {
+            "path": "services.f2d6c578-ffaf-4682-b81a-8bae13d9c7a3.source.repo",
+            "displayName": "Repo",
+            "type": "updated",
+            "from": "ivan-agentic-labs/forgeworks-agenttest-lab",
+            "to": "ivan-agentic-labs/forgeworks-agenttest-lab",
+            "destructive": false
+          }
+        ]
+      }
+    ],
+    "sharedVariables": [],
+    "privateNetworkDisabled": null
+  },
+  "changes": [
+    {
+      "repo": "forgeworks-apishield-agent",
+      "pr": 26,
+      "merge_sha": "5a6ad54e799715c27bc3c7ff7abe4ad7fae7fa4e",
+      "ci_head": "55c2a0fdc73026b44f3d5e72cafef31872cb6f0a",
+      "scope": "Boolean schema preservation",
+      "ci_runs": [
+        38103089879,
+        38103089928,
+        38103089866,
+        38103089873
+      ],
+      "merged_readback": true
+    },
+    {
+      "repo": "forgeworks-datareconcile-ai",
+      "pr": 19,
+      "merge_sha": "eaedd5fb2b13225d11a45c37432ba00891b3902d",
+      "ci_head": "7ec0317a42be497df4bba5a33dff29f34058818f",
+      "scope": "Lossless browser integer transport",
+      "ci_runs": [
+        38103617252,
+        38103617159,
+        38103617212
+      ],
+      "python_passed": 216,
+      "python_skipped": 1,
+      "node_passed": 15,
+      "chromium": "153.0.8010.12",
+      "browser_total_minor": "18446744073709551614",
+      "browser_javascript_errors": 0,
+      "merged_readback": true
+    },
+    {
+      "repo": "forgeworks-agenttest-lab",
+      "pr": 18,
+      "merge_sha": "7fa72024bd4c761590b5474f5453697d4007e711",
+      "ci_head": "b4fa864afcdbdfd153056084d864346f001e8ef3",
+      "scope": "Strict finite numeric evidence and safe HTTP validation errors",
+      "ci_runs": [
+        38103853438,
+        38103853440,
+        38103853421
+      ],
+      "python_passed": 296,
+      "python_skipped": 1,
+      "merged_readback": true
+    }
+  ],
+  "limits": [
+    "Railway source pins only staged; no deployment applied",
+    "All five services online at inventory read; old source versions remain live",
+    "Real provisioned identity sessions and business acceptance are unverified",
+    "No load test or production recovery acceptance claimed",
+    "Prior Railway deployment acceptance was denied; no alternative deployment route attempted"
+  ]
+}
