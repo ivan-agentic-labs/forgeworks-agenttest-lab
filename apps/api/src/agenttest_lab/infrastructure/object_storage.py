@@ -32,6 +32,11 @@ class ObjectStorage:
         self.access=os.environ.get("S3_ACCESS_KEY_ID", "")
         self.secret=os.environ.get("S3_SECRET_ACCESS_KEY", "")
         self.style=os.environ.get("S3_URL_STYLE", "virtual-host")
+        # urlsplit silently strips ASCII tabs, CR and LF and accepts some
+        # ambiguous authority spellings. Never silently canonicalize the
+        # configured destination for AWS-signed private object requests.
+        if any(ord(ch) <= 0x20 or ord(ch) == 0x7f or ch == "\\" for ch in self.endpoint):
+            reject("STORAGE_NOT_CONFIGURED", 503)
         parsed=urllib.parse.urlsplit(self.endpoint)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment or parsed.port:
             reject("STORAGE_NOT_CONFIGURED",503)
