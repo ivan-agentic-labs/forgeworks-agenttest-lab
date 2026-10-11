@@ -250,3 +250,19 @@ def test_provider_like_but_safe_case_identity_remains_unchanged():
                                        expected_case_key=case_key)
     assert result.records[0]["case_key"] == case_key
     assert result.redaction_count == 0
+
+
+@pytest.mark.parametrize("field", [
+    "client_ip", "remoteIp", "ip_address", "ipAddress",
+    "source_ip", "customer_ip", "userIp",
+])
+def test_structured_network_identifiers_are_redacted_from_persisted_traces(field):
+    source = json.dumps({
+        "case_key": "case-1",
+        "metadata": {field: "203.0.113.42", "ip_version": 4},
+    })
+    result = validate_and_redact_jsonl(source, expected_case_key="case-1")
+    assert result.records[0]["metadata"][field] == "[REDACTED]"
+    assert result.records[0]["metadata"]["ip_version"] == 4
+    assert "203.0.113.42" not in result.redacted_jsonl
+    assert result.redaction_count == 1
