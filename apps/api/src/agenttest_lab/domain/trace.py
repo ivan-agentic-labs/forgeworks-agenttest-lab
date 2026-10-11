@@ -74,9 +74,27 @@ def redact_trace_value(value: Any, *, _sensitive: bool = False) -> tuple[Any, in
         count = 0
         for key, item in value.items():
             key_text = str(key)
-            clean, changed = redact_trace_value(item, _sensitive=bool(_SENSITIVE_KEY.search(key_text) or _PII_KEY.search(key_text)))
-            out[key_text] = clean
-            count += changed
+            # JSON object *keys* can themselves contain customer identifiers.
+            # Never persist the original key when it matches a sensitive
+            # literal. Use unique positional names to preserve entries if
+            # multiple email addresses were used as map keys.
+            _, key_redactions = _redact_string(key_text)
+            safe_key = key_text
+            if key_redactions:
+                suffix = len(out) + 1
+                safe_key = f"[REDACTED_KEY_{suffix}]"
+                while safe_key in out or safe_key in value:
+                    suffix += 1
+                    safe_key = f"[REDACTED_KEY_{suffix}]"
+            # Normalize common camelCase field names before matching PII
+            # markers such as phoneNumber, nationalId, and dateOfBirth.
+            canonical_key = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key_text)
+            clean, changed = redact_trace_value(
+                item,
+                _sensitive=bool(_SENSITIVE_KEY.search(key_text) or _PII_KEY.search(canonical_key)),
+            )
+            out[safe_key] = clean
+            count += changed + key_redactions
         return out, count
     if isinstance(value, list):
         out_list = []

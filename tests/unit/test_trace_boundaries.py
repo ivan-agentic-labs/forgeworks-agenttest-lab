@@ -122,3 +122,48 @@ def test_structured_pii_key_is_redacted_even_if_value_has_no_known_pattern(field
     result = validate_and_redact_jsonl(source)
     assert result.records[0]["attributes"][field] == "[REDACTED]"
     assert "opaquevalue123" not in result.redacted_jsonl
+
+
+def test_dynamic_sensitive_json_keys_do_not_leak_or_collide():
+    email1 = "alpha" + chr(64) + "example.invalid"
+    email2 = "beta" + chr(64) + "example.invalid"
+    # Explicit placeholder is intentionally present to expose key collisions.
+    original = {
+        "case_key": "case-1",
+        "contacts": {
+            "[REDACTED_KEY_1]": "safe-existing-entry",
+            email1: "first-value",
+            email2: "second-value",
+        },
+    }
+    result = validate_and_redact_jsonl(json.dumps(original))
+    contacts = result.records[0]["contacts"]
+    assert len(contacts) == 3
+    assert contacts["[REDACTED_KEY_1]"] == "safe-existing-entry"
+    assert set(contacts.values()) == {"safe-existing-entry", "first-value", "second-value"}
+    assert all(key not in contacts for key in (email1, email2))
+    assert email1 not in result.redacted_jsonl and email2 not in result.redacted_jsonl
+    assert result.redaction_count == 2
+
+
+@pytest.mark.parametrize("field", [
+    "phoneNumber", "customerPhone", "nationalId", "dateOfBirth",
+    "passportNo", "emailAddress", "mobileNumber",
+])
+def test_camel_case_pii_field_values_are_redacted(field):
+    source = json.dumps({"case_key": "case-1", "metadata": {field: 123456789}})
+    result = validate_and_redact_jsonl(source)
+    assert result.records[0]["metadata"][field] == "[REDACTED]"
+    assert "123456789" not in result.redacted_jsonl
+    assert result.redaction_count == 1
+
+
+def test_redacted_dynamic_key_hash_is_deterministic_without_raw_identifier():
+    from hashlib import sha256
+    email = "name" + chr(64) + "example.invalid"
+    source = json.dumps({"case_key": "case-1", "metadata": {email: "safe"}})
+    first = validate_and_redact_jsonl(source)
+    second = validate_and_redact_jsonl(source)
+    assert first.sha256 == second.sha256
+    assert first.sha256 == sha256(first.redacted_jsonl.encode("utf-8")).hexdigest()
+    assert email not in first.redacted_jsonl
