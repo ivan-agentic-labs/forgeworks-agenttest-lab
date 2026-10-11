@@ -167,3 +167,60 @@ def test_redacted_dynamic_key_hash_is_deterministic_without_raw_identifier():
     assert first.sha256 == second.sha256
     assert first.sha256 == sha256(first.redacted_jsonl.encode("utf-8")).hexdigest()
     assert email not in first.redacted_jsonl
+
+
+@pytest.mark.parametrize("credential", [
+    "ghp_" + "A" * 36,
+    "gho_" + "B" * 36,
+    "ghs_" + "C" * 36,
+    "github_pat_" + "D" * 26 + "_" + "E" * 26,
+    "glpat-" + "F" * 20,
+    "AKIA" + "G" * 16,
+    "ASIA" + "H" * 16,
+    "AIza" + "I" * 35,
+])
+def test_provider_credentials_are_redacted_in_neutral_trace_fields(credential):
+    original = {"case_key": "case-1", "observation": "received " + credential + " in a tool result"}
+    result = validate_and_redact_jsonl(json.dumps(original))
+    assert credential not in result.redacted_jsonl
+    assert result.records[0]["observation"] == "received [REDACTED] in a tool result"
+    assert result.redaction_count == 1
+
+
+@pytest.mark.parametrize("credential", [
+    "ghp_" + "A" * 36,
+    "glpat-" + "B" * 20,
+    "AKIA" + "C" * 16,
+    "AIza" + "D" * 35,
+])
+def test_provider_credentials_used_as_json_object_keys_are_not_persisted(credential):
+    original = {"case_key": "case-1", "tool_output": {credential: "opaque observation"}}
+    result = validate_and_redact_jsonl(json.dumps(original))
+    keys = list(result.records[0]["tool_output"])
+    assert len(keys) == 1 and keys[0].startswith("[REDACTED_KEY_")
+    assert credential not in result.redacted_jsonl
+    assert result.redaction_count == 1
+
+
+def test_multiple_provider_patterns_and_sha_are_stable():
+    from hashlib import sha256
+    tokens = ["ghp_" + "A" * 36, "glpat-" + "B" * 20, "AKIA" + "C" * 16, "AIza" + "D" * 35]
+    source = json.dumps({"case_key": "case-1", "events": [{"observation": item} for item in tokens]})
+    first = validate_and_redact_jsonl(source)
+    second = validate_and_redact_jsonl(source)
+    assert first.redaction_count == len(tokens)
+    assert all(item not in first.redacted_jsonl for item in tokens)
+    assert first.sha256 == second.sha256 == sha256(first.redacted_jsonl.encode("utf-8")).hexdigest()
+
+
+@pytest.mark.parametrize("ordinary", [
+    "ghp_" + "A" * 12,
+    "glpat-" + "B" * 8,
+    "AKIA" + "C" * 8,
+    "AIza" + "D" * 12,
+    "trace_request_id_2026",
+])
+def test_short_provider_like_strings_and_benign_ids_are_retained(ordinary):
+    result = validate_and_redact_jsonl(json.dumps({"case_key": "case-1", "observation": ordinary}))
+    assert result.records[0]["observation"] == ordinary
+    assert result.redaction_count == 0

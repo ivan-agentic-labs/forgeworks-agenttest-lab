@@ -31,6 +31,14 @@ _EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 _BEARER = re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE)
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
 _HEX_SECRET = re.compile(r"\b(?:sk|rk|pk)_[A-Za-z0-9_-]{12,}\b")
+# Recognizable provider credential formats can appear in otherwise neutral
+# fields such as "message", "observation", or even arbitrary map keys.
+# These deliberately match provider-specific shapes rather than all long
+# alphanumeric strings, which would destroy benign trace observations.
+_GITHUB_TOKEN = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{20,})\b")
+_GITLAB_TOKEN = re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}\b")
+_AWS_ACCESS_KEY = re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")
+_GOOGLE_API_KEY = re.compile(r"\bAIza[A-Za-z0-9_-]{35}\b")
 
 
 class TraceValidationError(ValueError):
@@ -60,7 +68,10 @@ def _redact_string(value: str) -> tuple[str, int]:
         count += 1
         return _REDACTED
 
-    for pattern in (_BEARER, _JWT, _HEX_SECRET, _EMAIL):
+    for pattern in (
+        _BEARER, _JWT, _HEX_SECRET, _EMAIL,
+        _GITHUB_TOKEN, _GITLAB_TOKEN, _AWS_ACCESS_KEY, _GOOGLE_API_KEY,
+    ):
         value = pattern.sub(replace, value)
     return value, count
 
