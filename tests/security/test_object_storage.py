@@ -49,16 +49,15 @@ def test_unsafe_endpoint_rejected(monkeypatch,endpoint):
 
 
 @pytest.mark.parametrize("endpoint", [
-    "https://storage.examp\\tle.invalid",
-    "https://storage.example.invalid\\r\\n",
-    "https://storage.example.invalid\\x00",
-    "https://storage.example.invalid\\x7f",
-    "https://storage.example.invalid\\\\evil.invalid",
+    "https://storage.examp\tle.invalid",
+    "https://storage.example.invalid\r\n",
+    "https://storage.example.invalid\x00",
+    "https://storage.example.invalid\x7f",
+    "https://storage.example.invalid\\evil.invalid",
 ])
 def test_storage_origin_must_not_be_silently_normalized(monkeypatch, endpoint):
-    # urllib.parse.urlsplit can remove tabs/CR/LF in the authority.
-    # A credential-signed request must only target the configured literal
-    # origin, never a silently transformed hostname.
+    # urllib.parse.urlsplit can silently remove ASCII control characters
+    # from the authority. Never sign requests to a modified destination.
     for key, value in {
         "S3_BUCKET": "private-bucket",
         "S3_REGION": "auto",
