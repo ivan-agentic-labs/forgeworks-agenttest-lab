@@ -191,6 +191,9 @@ def validate_and_redact_jsonl(content: str | bytes, *, require_case_key: bool = 
             or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", case_key) is None
             or _JWT.fullmatch(case_key) is not None
             or _HEX_SECRET.fullmatch(case_key) is not None
+            or any(pattern.fullmatch(case_key) is not None for pattern in (
+                _GITHUB_TOKEN, _GITLAB_TOKEN, _AWS_ACCESS_KEY, _GOOGLE_API_KEY,
+            ))
         ):
             raise TraceValidationError(line_number, "INVALID_CASE_KEY", "case_key must match the dataset identity profile")
         if expected_case_key is not None and case_key != expected_case_key:
