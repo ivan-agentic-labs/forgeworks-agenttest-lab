@@ -224,3 +224,29 @@ def test_short_provider_like_strings_and_benign_ids_are_retained(ordinary):
     result = validate_and_redact_jsonl(json.dumps({"case_key": "case-1", "observation": ordinary}))
     assert result.records[0]["observation"] == ordinary
     assert result.redaction_count == 0
+
+
+@pytest.mark.parametrize("secret_identity", [
+    "ghp_" + "A" * 36,
+    "github_pat_" + "B" * 26,
+    "glpat-" + "C" * 20,
+    "AKIA" + "D" * 16,
+    "ASIA" + "E" * 16,
+    "AIza" + "F" * 35,
+])
+def test_provider_credential_is_never_accepted_as_trace_case_identity(secret_identity):
+    # A case identity must remain byte-for-byte stable after trace redaction.
+    # If the redactor would mask it, reject rather than detach evidence from
+    # the dataset case by silently changing "case_key" to "[REDACTED]".
+    source = json.dumps({"case_key": secret_identity, "observation": "safe"})
+    with pytest.raises(TraceValidationError) as error:
+        validate_and_redact_jsonl(source, expected_case_key=secret_identity)
+    assert error.value.code == "INVALID_CASE_KEY"
+
+
+def test_provider_like_but_safe_case_identity_remains_unchanged():
+    case_key = "audit-AKIA-not-a-real-key"
+    result = validate_and_redact_jsonl(json.dumps({"case_key": case_key, "event": "safe"}),
+                                       expected_case_key=case_key)
+    assert result.records[0]["case_key"] == case_key
+    assert result.redaction_count == 0
