@@ -12,6 +12,7 @@ from uuid import UUID
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Query
 from fastapi.responses import JSONResponse, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -46,7 +47,7 @@ class CaseResultInput(BaseModel):
     case_key: str = Field(min_length=1, max_length=128)
     observed_output: Any = None
     status: str = "PASS"
-    score: float | None = None
+    score: float | None = Field(default=None, strict=True, allow_inf_nan=False)
     trace_jsonl: str | None = Field(default=None, max_length=1_048_576)
     trace_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
@@ -54,7 +55,7 @@ class CaseResultInput(BaseModel):
 class GraderConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
     mode: Literal["external-scores", "exact-json-v1"] = "external-scores"
-    threshold: float = Field(default=0.0, ge=0.0, le=1.0)
+    threshold: float = Field(default=0.0, ge=0.0, le=1.0, strict=True, allow_inf_nan=False)
     seed: int | None = Field(default=None, ge=-(2**63), le=2**63-1, strict=True)
     seed_source: str | None = Field(default=None, min_length=1)
 
@@ -65,7 +66,7 @@ class Run(BaseModel):
     agent_build_id: UUID
     grader_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     grader_config: GraderConfig | None = None
-    threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    threshold: float | None = Field(default=None, ge=0.0, le=1.0, strict=True, allow_inf_nan=False)
     seed: int | None = Field(default=None, ge=-(2**63), le=2**63-1, strict=True)
     case_results: list[CaseResultInput] | None = Field(default=None, max_length=1000)
 
@@ -74,7 +75,7 @@ class Compare(BaseModel):
     model_config = ConfigDict(extra="forbid")
     baseline_run_id: UUID
     policy_version: str = Field(min_length=1)
-    threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    threshold: float | None = Field(default=None, ge=0.0, le=1.0, strict=True, allow_inf_nan=False)
 
 
 class UploadIntentRequest(BaseModel):
@@ -144,6 +145,16 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     if os.getenv("S3_ENDPOINT"):
         from agenttest_lab.infrastructure.object_storage import ObjectStorage
         objects = ObjectStorage("agenttest-lab")
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_, error: RequestValidationError):
+        # Pydantic errors may carry non-finite values or sensitive raw input.
+        # Return the stable problem envelope rather than echoing those values.
+        return JSONResponse(status_code=422, content={
+            "type": "about:blank", "title": "Request rejected", "status": 422,
+            "code": "INVALID_REQUEST", "detail": "Request does not match the input contract",
+            "request_id": "runtime",
+        })
 
     @app.exception_handler(HTTPException)
     async def errors(_, error: HTTPException):
