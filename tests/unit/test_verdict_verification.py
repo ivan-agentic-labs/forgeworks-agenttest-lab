@@ -90,3 +90,19 @@ def test_cli_exit_code(signed, tmp_path, verdict, expected_exit):
     result = subprocess.run([sys.executable, str(script), "--envelope", str(envelope), "--public-key", str(trusted_key), "--expected-binding", str(expectation)], capture_output=True, text=True)
     assert result.returncode == expected_exit, result.stderr
     assert json.loads(result.stdout) == {"verified": True, "verdict": verdict}
+
+
+def test_noncanonical_base64_signature_spelling_is_rejected(signed):
+    public, binding, doc, sign = signed
+    envelope = sign(doc)
+    original = envelope["signature"]
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    # A 64-byte Ed25519 signature ends in two '=' padding symbols. The
+    # unused low 4 bits of the final encoded data symbol must be zero.
+    index = alphabet.index(original[-3])
+    changed = alphabet[(index & 0x30) | 1]
+    envelope["signature"] = original[:-3] + changed + original[-2:]
+    assert envelope["signature"] != original
+    assert base64.urlsafe_b64decode(envelope["signature"]) == base64.urlsafe_b64decode(original)
+    with pytest.raises(VerdictVerificationError, match="VERDICT_SIGNATURE_NONCANONICAL"):
+        verify_verdict(envelope, public, binding)
