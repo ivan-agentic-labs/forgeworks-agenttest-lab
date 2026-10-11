@@ -79,7 +79,13 @@ def redact_trace_value(value: Any, *, _sensitive: bool = False) -> tuple[Any, in
             # literal. Use unique positional names to preserve entries if
             # multiple email addresses were used as map keys.
             _, key_redactions = _redact_string(key_text)
-            safe_key = f"[REDACTED_KEY_{len(out) + 1}]" if key_redactions else key_text
+            safe_key = key_text
+            if key_redactions:
+                suffix = len(out) + 1
+                safe_key = f"[REDACTED_KEY_{suffix}]"
+                while safe_key in out or safe_key in value:
+                    suffix += 1
+                    safe_key = f"[REDACTED_KEY_{suffix}]"
             # Normalize common camelCase field names before matching PII
             # markers such as phoneNumber, nationalId, and dateOfBirth.
             canonical_key = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key_text)
