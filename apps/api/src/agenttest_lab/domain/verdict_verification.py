@@ -80,6 +80,10 @@ def verify_verdict(envelope: dict, public_key_pem: bytes, expected_binding: dict
             raise VerdictVerificationError("VERDICT_SIGNATURE_INVALID")
         signature = base64.b64decode(signature_text, altchars=b"-_", validate=True)
         if len(signature) != 64: raise VerdictVerificationError("VERDICT_SIGNATURE_INVALID")
+        # Reject alternate URL-safe base64 spellings of the same signed bytes.
+        # A receipt must have one canonical envelope identity.
+        if base64.urlsafe_b64encode(signature).decode("ascii") != signature_text:
+            raise VerdictVerificationError("VERDICT_SIGNATURE_NONCANONICAL")
         public.verify(signature, payload)
         document = strict_document(raw)
         binding = document.get("binding")
