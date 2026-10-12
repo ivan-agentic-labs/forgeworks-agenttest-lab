@@ -156,3 +156,63 @@ def test_exact_comparison_rejects_changed_implementation(tmp_path):
     with pytest.raises(StoreError) as error:
         store.compare(TENANT,candidate['id'],baseline['id'],'computed-policy')
     assert error.value.code == 'GRADER_IMPLEMENTATION_MISMATCH'
+
+
+
+def test_strict_exact_regression_catches_case_swap_hidden_by_average(tmp_path):
+    store = Store(str(tmp_path / "regression.sqlite"))
+    store.seed()
+    source = "\n".join([
+        json.dumps({"case_key": "case-A", "input": {}, "expected": "A"}),
+        json.dumps({"case_key": "case-B", "input": {}, "expected": "B"}),
+    ]) + "\n"
+    dataset = store.dataset(TENANT, "Two verified cases", USER)
+    version = store.version(TENANT, dataset, hashlib.sha256(source.encode()).hexdigest(), 2, source_jsonl=source)
+    build = store.build(TENANT, "Measured build", "b" * 64, "c" * 64, "p1")
+
+    def make_results(outputs):
+        return [
+            {"case_key": "case-A", "observed_output": outputs[0]},
+            {"case_key": "case-B", "observed_output": outputs[1]},
+        ]
+
+    baseline = store.run(TENANT, version, build, GRADER_SHA256, {"mode": MODE}, make_results(("A", "wrong")))
+    candidate = store.run(TENANT, version, build, GRADER_SHA256, {"mode": MODE}, make_results(("wrong", "B")))
+
+    # Legacy aggregate mode is retained for backward compatibility.
+    aggregate = store.compare(TENANT, candidate["id"], baseline["id"], "deterministic-v1")
+    assert aggregate["verdict"] == "PASS" and aggregate["delta"] == 0
+
+    # Same average, but case-A's computed grade regressed from 1 to 0.
+    strict = store.compare(TENANT, candidate["id"], baseline["id"], "strict-exact-no-regression-v1")
+    assert strict["verdict"] == "FAIL" and strict["delta"] == 0
+    with store.conn() as db:
+        artifact = db.execute(
+            "SELECT binding_json FROM artifact_exports WHERE tenant_id=? AND comparison_id=?",
+            (TENANT, strict["id"]),
+        ).fetchone()
+    signed_content = json.loads(artifact["binding_json"])
+    assert signed_content["regressed_case_count"] == 1
+    assert signed_content["binding"]["policy_version"] == "strict-exact-no-regression-v1"
+
+    same = store.run(TENANT, version, build, GRADER_SHA256, {"mode": MODE}, make_results(("A", "wrong")))
+    no_regression = store.compare(TENANT, same["id"], baseline["id"], "strict-exact-no-regression-v1")
+    assert no_regression["verdict"] == "PASS"
+    with store.conn() as db:
+        evidence = db.execute(
+            "SELECT binding_json FROM artifact_exports WHERE tenant_id=? AND comparison_id=?",
+            (TENANT, no_regression["id"]),
+        ).fetchone()
+    assert json.loads(evidence["binding_json"])["regressed_case_count"] == 0
+
+
+def test_strict_per_case_policy_rejects_unverified_external_scores(tmp_path):
+    store, version, build = setup(tmp_path, 1)
+    fake = [{"case_key": "actual", "status": "PASS", "score": 1.0}]
+    baseline = store.run(TENANT, version, build, "d" * 64, results=fake)
+    candidate = store.run(TENANT, version, build, "d" * 64, results=fake)
+    with pytest.raises(StoreError, match="Strict per-case regression proof") as exc:
+        store.compare(TENANT, candidate["id"], baseline["id"], "strict-exact-no-regression-v1")
+    assert exc.value.code == "STRICT_POLICY_REQUIRES_EXACT_GRADER"
+    with store.conn() as db:
+        assert db.execute("SELECT count(*) FROM comparisons").fetchone()[0] == 0
