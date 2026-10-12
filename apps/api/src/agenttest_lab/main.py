@@ -140,6 +140,8 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
     app = FastAPI(title="AgentTest Lab MVP", version="0.2.0")
     from agenttest_lab.presentation.body_budget import BodyBudgetMiddleware
     app.add_middleware(BodyBudgetMiddleware)
+    from agenttest_lab.presentation.operations import register_operations
+    register_operations(app, ROOT, "agenttest-lab")
     app.state.store = store
     objects = None
     if os.getenv("S3_ENDPOINT"):
