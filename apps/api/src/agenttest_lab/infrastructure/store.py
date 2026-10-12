@@ -361,6 +361,9 @@ class Store:
         candidate_mode = json.loads(candidate["grader_config_json"]).get("mode", "external-scores")
         if base_mode != candidate_mode:
             raise StoreError("GRADING_MODE_MISMATCH", "Computed grades cannot be compared with caller-supplied scores", 409)
+        strict_policy = policy == "strict-exact-no-regression-v1"
+        if strict_policy and base_mode != MODE:
+            raise StoreError("STRICT_POLICY_REQUIRES_EXACT_GRADER", "Strict per-case regression proof requires verified exact-json grading", 409)
         if base_mode == MODE and baseline["grader_sha"] != candidate["grader_sha"]:
             raise StoreError("GRADER_IMPLEMENTATION_MISMATCH", "Exact JSON comparisons require the same grader implementation", 409)
         effective_threshold = float(threshold if threshold is not None else max(float(baseline["threshold"] or 0), float(candidate["threshold"] or 0)))
@@ -398,7 +401,21 @@ class Store:
         candidate_scores = [float(candidate_map[key]["score"]) for key in paired_keys if candidate_map[key]["score"] is not None]
         delta = (sum(candidate_scores) / len(candidate_scores) - sum(base_scores) / len(base_scores)) if base_scores and candidate_scores else -1.0
         bad_status = any(row["grade_status"] in terminal_statuses for row in (*base_cases, *candidate_cases))
-        verdict = "PASS" if missing == 0 and not bad_status and delta >= -effective_threshold else "FAIL"
+        # Mean scores can hide an individual regression (1,0 -> 0,1).
+        # This opt-in policy checks each *verified exact-json* case independently
+        # without changing the existing aggregate comparison contract.
+        regressed = 0
+        if strict_policy:
+            for key in paired_keys:
+                baseline_case = base_map[key]
+                candidate_case = candidate_map[key]
+                base_score = baseline_case["score"]
+                candidate_score = candidate_case["score"]
+                if (base_score is not None and candidate_score is not None and candidate_score < base_score):
+                    regressed += 1
+                elif baseline_case["grade_status"] == "PASS" and candidate_case["grade_status"] != "PASS":
+                    regressed += 1
+        verdict = "PASS" if missing == 0 and not bad_status and delta >= -effective_threshold and (not strict_policy or regressed == 0) else "FAIL"
         binding = {
             "baseline_run_id": baseline_id, "candidate_run_id": candidate_id,
             "dataset_version_id": baseline["version_id"], "baseline_build_id": baseline["build_id"],
@@ -411,6 +428,8 @@ class Store:
             },
         }
         export = {"binding": binding, "paired": len(paired_keys), "missing": missing, "delta": delta, "verdict": verdict}
+        if strict_policy:
+            export["regressed_case_count"] = regressed
         export_json = canonical_json(export)
         artifact_sha = hashlib.sha256(export_json.encode("utf-8")).hexdigest()
         comparison_id, artifact_id, created = str(uuid.uuid4()), str(uuid.uuid4()), now()
