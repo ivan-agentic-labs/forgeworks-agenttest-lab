@@ -47,6 +47,21 @@ _GITLAB_TOKEN = re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}\b")
 _AWS_ACCESS_KEY = re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")
 _GOOGLE_API_KEY = re.compile(r"\bAIza[A-Za-z0-9_-]{35}\b")
 
+# Passwords in URLs, connection strings and textual log attributes do not
+# necessarily resemble provider tokens. Never preserve their literal values.
+# Keep nonsecret query parameters and URL hostnames for debugging.
+_EMBEDDED_SECRET_ASSIGNMENT = re.compile(
+    r"(?i)(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|"
+    r"password|passphrase|authorization|secret|auth[_-]?token|session[_-]?token|"
+    r"private[_-]?key)=)[^\s&#;\\"'<>]+"
+)
+_URL_USERINFO = re.compile(
+    r"(?i)\b((?:https?|postgres(?:ql)?|redis(?:s)?|amqps?|mongodb(?:\+srv)?|mysql)://)"
+    r"[^\s/@:?]+:[^\s/@]+@"
+)
+_BASIC_AUTH = re.compile(r"(?i)\bBasic[ \t]+[A-Za-z0-9+/]+={0,2}(?![A-Za-z0-9+/=])")
+
+
 _NUMERIC_FINANCIAL_ID = re.compile(r"(?<![A-Za-z0-9])(?:[0-9][ -]?){12,18}[0-9](?![A-Za-z0-9])")
 
 
@@ -97,6 +112,19 @@ def _redact_string(value: str) -> tuple[str, int]:
         _GITHUB_TOKEN, _GITLAB_TOKEN, _AWS_ACCESS_KEY, _GOOGLE_API_KEY,
     ):
         value = pattern.sub(replace, value)
+    def replace_userinfo(match: re.Match[str]) -> str:
+        nonlocal count
+        count += 1
+        return match.group(1) + _REDACTED + "@"
+
+    def replace_assignment(match: re.Match[str]) -> str:
+        nonlocal count
+        count += 1
+        return match.group(1) + _REDACTED
+
+    value = _URL_USERINFO.sub(replace_userinfo, value)
+    value = _EMBEDDED_SECRET_ASSIGNMENT.sub(replace_assignment, value)
+    value = _BASIC_AUTH.sub(replace, value)
     value = _NUMERIC_FINANCIAL_ID.sub(
         lambda match: replace(match) if _valid_financial_checksum(match.group()) else match.group(),
         value,
