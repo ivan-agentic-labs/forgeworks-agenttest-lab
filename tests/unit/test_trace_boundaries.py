@@ -307,3 +307,44 @@ def test_trace_redaction_of_extended_pii_stays_deterministic_and_keeps_evaluatio
     assert first.records[0]["customer"]["result_status"] == "PASS"
     assert first.redaction_count == 2
     assert "Synthetic Road" not in first.redacted_jsonl and "123456789" not in first.redacted_jsonl
+
+def _synthetic_check_digit_sequence():
+    # Build a checksum-valid synthetic identifier without storing real data.
+    prefix = "7" + "0" * 14
+    def check(value):
+        total = 0
+        for index, char in enumerate(reversed(value)):
+            digit = int(char)
+            if index % 2:
+                digit = digit * 2
+                if digit > 9:
+                    digit -= 9
+            total += digit
+        return total % 10 == 0
+    return next(prefix + digit for digit in "0123456789" if check(prefix + digit))
+
+
+def test_sensitive_numeric_id_in_neutral_trace_observations_is_redacted():
+    sequence = _synthetic_check_digit_sequence()
+    source = json.dumps({"case_key": "case-1", "observation": "synthetic sequence: " + sequence})
+    result = validate_and_redact_jsonl(source)
+    assert sequence not in result.redacted_jsonl
+    assert result.records[0]["observation"] == "synthetic sequence: [REDACTED]"
+    assert result.redaction_count == 1
+
+
+def test_spaced_sensitive_numeric_identifier_and_dynamic_key_are_redacted():
+    sequence = _synthetic_check_digit_sequence()
+    formatted = " ".join(sequence[index:index + 4] for index in range(0, 16, 4))
+    result = validate_and_redact_jsonl(json.dumps({"case_key": "case-1", "values": {formatted: "synthetic"}}))
+    assert formatted not in result.redacted_jsonl
+    assert next(iter(result.records[0]["values"])).startswith("[REDACTED_KEY_")
+    assert result.redaction_count == 1
+
+
+def test_nearly_identical_nonmatching_numeric_string_is_not_redacted():
+    valid = _synthetic_check_digit_sequence()
+    invalid = valid[:-1] + str((int(valid[-1]) + 1) % 10)
+    result = validate_and_redact_jsonl(json.dumps({"case_key": "case-1", "counter": invalid}))
+    assert result.records[0]["counter"] == invalid
+    assert result.redaction_count == 0

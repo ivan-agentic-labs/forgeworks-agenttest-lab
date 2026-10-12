@@ -47,6 +47,23 @@ _GITLAB_TOKEN = re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}\b")
 _AWS_ACCESS_KEY = re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")
 _GOOGLE_API_KEY = re.compile(r"\bAIza[A-Za-z0-9_-]{35}\b")
 
+_NUMERIC_FINANCIAL_ID = re.compile(r"(?<![A-Za-z0-9])(?:[0-9][ -]?){12,18}[0-9](?![A-Za-z0-9])")
+
+
+def _valid_financial_checksum(candidate: str) -> bool:
+    numbers = [int(ch) for ch in candidate if "0" <= ch <= "9"]
+    if not 13 <= len(numbers) <= 19:
+        return False
+    result = 0
+    for index, digit in enumerate(reversed(numbers)):
+        if index % 2:
+            digit = digit * 2
+            if digit > 9:
+                digit -= 9
+        result += digit
+    return result % 10 == 0
+
+
 
 class TraceValidationError(ValueError):
     """A trace validation failure with a stable code and source line."""
@@ -80,6 +97,10 @@ def _redact_string(value: str) -> tuple[str, int]:
         _GITHUB_TOKEN, _GITLAB_TOKEN, _AWS_ACCESS_KEY, _GOOGLE_API_KEY,
     ):
         value = pattern.sub(replace, value)
+    value = _NUMERIC_FINANCIAL_ID.sub(
+        lambda match: replace(match) if _valid_financial_checksum(match.group()) else match.group(),
+        value,
+    )
     return value, count
 
 
