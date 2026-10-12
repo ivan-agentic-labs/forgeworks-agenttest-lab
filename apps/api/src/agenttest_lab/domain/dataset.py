@@ -2,6 +2,7 @@
 import hashlib
 import json
 import math
+from decimal import Decimal, InvalidOperation
 import re
 
 MAX_BYTES = 1_048_576
@@ -23,6 +24,18 @@ def parse_dataset(source: str, expected_sha: str, expected_count: int) -> list[d
         return result
     def constant(_):
         raise ValueError("DATASET_NONFINITE_NUMBER")
+    def precise_float(raw: str) -> float:
+        # Exact grading must not silently equate distinct source numbers
+        # after binary64 rounding or turn tiny nonzero values into zero.
+        try:
+            converted = float(raw)
+            if not math.isfinite(converted):
+                raise ValueError("DATASET_NONFINITE_NUMBER")
+            if Decimal(raw) != Decimal(repr(converted)):
+                raise ValueError("DATASET_NUMERIC_PRECISION_LOSS")
+        except (OverflowError, InvalidOperation) as error:
+            raise ValueError("DATASET_NUMERIC_PRECISION_LOSS") from error
+        return converted
     lines = source.split("\n")
     if lines[-1] == "":
         lines.pop()
@@ -31,7 +44,10 @@ def parse_dataset(source: str, expected_sha: str, expected_count: int) -> list[d
     cases, keys, nodes = [], set(), 0
     for line in lines:
         try:
-            case = json.loads(line, object_pairs_hook=unique, parse_constant=constant)
+            case = json.loads(
+                line, object_pairs_hook=unique, parse_constant=constant,
+                parse_float=precise_float,
+            )
         except (json.JSONDecodeError, RecursionError) as error:
             raise ValueError("DATASET_JSONL_INVALID") from error
         if not isinstance(case, dict) or set(case) != {"case_key", "input", "expected"}:
