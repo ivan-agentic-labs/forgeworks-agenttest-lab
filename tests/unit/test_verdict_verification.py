@@ -106,3 +106,32 @@ def test_noncanonical_base64_signature_spelling_is_rejected(signed):
     assert base64.urlsafe_b64decode(envelope["signature"]) == base64.urlsafe_b64decode(original)
     with pytest.raises(VerdictVerificationError, match="VERDICT_SIGNATURE_NONCANONICAL"):
         verify_verdict(envelope, public, binding)
+
+
+
+@pytest.mark.parametrize("regression_count", [None, -1, 1, True, 1.0])
+def test_strict_signed_verdict_cannot_claim_pass_with_unproven_or_regressed_cases(signed, regression_count):
+    public, binding, doc, sign = signed
+    binding["policy_version"] = "strict-exact-no-regression-v1"
+    doc["binding"] = deepcopy(binding)
+    if regression_count is not None:
+        doc["regressed_case_count"] = regression_count
+    with pytest.raises(VerdictVerificationError, match="VERDICT_POLICY_INCONSISTENT"):
+        verify_verdict(sign(doc), public, binding)
+
+
+def test_strict_signed_fail_with_one_regression_remains_verifiable(signed):
+    public, binding, doc, sign = signed
+    binding["policy_version"] = "strict-exact-no-regression-v1"
+    doc["binding"] = deepcopy(binding)
+    doc["regressed_case_count"] = 1
+    doc["verdict"] = "FAIL"
+    assert verify_verdict(sign(doc), public, binding)["regressed_case_count"] == 1
+
+
+def test_strict_signed_pass_requires_zero_regressions(signed):
+    public, binding, doc, sign = signed
+    binding["policy_version"] = "strict-exact-no-regression-v1"
+    doc["binding"] = deepcopy(binding)
+    doc["regressed_case_count"] = 0
+    assert verify_verdict(sign(doc), public, binding)["verdict"] == "PASS"
