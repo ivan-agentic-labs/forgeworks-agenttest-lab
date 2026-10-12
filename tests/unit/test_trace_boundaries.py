@@ -266,3 +266,44 @@ def test_structured_network_identifiers_are_redacted_from_persisted_traces(field
     assert result.records[0]["metadata"]["ip_version"] == 4
     assert "203.0.113.42" not in result.redacted_jsonl
     assert result.redaction_count == 1
+
+
+@pytest.mark.parametrize("field", [
+    "firstName", "last_name", "fullName", "legal_name",
+    "streetAddress", "mailing_address", "billingAddress", "shipping_address",
+    "residential_address", "postalCode", "zip_code",
+    "bankAccount", "bank_account_number", "creditCardNumber", "card_number",
+    "iban", "swiftBic", "routing_number", "taxId",
+])
+def test_nested_personal_and_payment_identifiers_never_persist(field):
+    sensitive_value = "opaque-synthetic-identifier-123456"
+    original = {"case_key": "case-1", "observation": {
+        "nested": [{field: sensitive_value, "event_count": 2}]
+    }}
+    result = validate_and_redact_jsonl(json.dumps(original))
+    fields = result.records[0]["observation"]["nested"][0]
+    assert fields[field] == "[REDACTED]"
+    assert fields["event_count"] == 2
+    assert sensitive_value not in result.redacted_jsonl
+    assert result.redaction_count == 1
+
+
+def test_trace_redaction_of_extended_pii_stays_deterministic_and_keeps_evaluation_fields():
+    import hashlib
+    source = json.dumps({
+        "case_key": "case-1",
+        "event": "graded",
+        "latency_ms": 12,
+        "customer": {
+            "billingAddress": "Synthetic Road 123",
+            "bankAccount": 123456789,
+            "result_status": "PASS"
+        }
+    })
+    first = validate_and_redact_jsonl(source, expected_case_key="case-1")
+    second = validate_and_redact_jsonl(source, expected_case_key="case-1")
+    assert first.sha256 == second.sha256 == hashlib.sha256(first.redacted_jsonl.encode()).hexdigest()
+    assert first.records[0]["latency_ms"] == 12
+    assert first.records[0]["customer"]["result_status"] == "PASS"
+    assert first.redaction_count == 2
+    assert "Synthetic Road" not in first.redacted_jsonl and "123456789" not in first.redacted_jsonl
