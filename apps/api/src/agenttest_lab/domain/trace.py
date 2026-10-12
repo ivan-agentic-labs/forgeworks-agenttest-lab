@@ -53,7 +53,7 @@ _GOOGLE_API_KEY = re.compile(r"\bAIza[A-Za-z0-9_-]{35}\b")
 _EMBEDDED_SECRET_ASSIGNMENT = re.compile(
     r"(?i)(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|"
     r"password|passphrase|authorization|secret|auth[_-]?token|session[_-]?token|"
-    r"private[_-]?key)=)[^\s&#;\\"'<>]+"
+    r"""private[_-]?key)=)[^\s&#;"'<>]+"""
 )
 _URL_USERINFO = re.compile(
     r"(?i)\b((?:https?|postgres(?:ql)?|redis(?:s)?|amqps?|mongodb(?:\+srv)?|mysql)://)"
