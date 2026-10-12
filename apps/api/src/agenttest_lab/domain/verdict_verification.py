@@ -98,6 +98,12 @@ def verify_verdict(envelope: dict, public_key_pem: bytes, expected_binding: dict
             raise VerdictVerificationError("VERDICT_SCHEMA_INVALID")
         if document["verdict"] == "PASS" and (document["missing"] != 0 or delta < -expected_binding["threshold"]):
             raise VerdictVerificationError("VERDICT_POLICY_INCONSISTENT")
+        if binding.get("policy_version") == "strict-exact-no-regression-v1":
+            regressions = document.get("regressed_case_count")
+            if type(regressions) is not int or not 0 <= regressions <= document["paired"]:
+                raise VerdictVerificationError("VERDICT_POLICY_INCONSISTENT")
+            if document["verdict"] == "PASS" and regressions:
+                raise VerdictVerificationError("VERDICT_POLICY_INCONSISTENT")
         return document
     except VerdictVerificationError:
         raise
