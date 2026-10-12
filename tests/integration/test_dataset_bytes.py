@@ -47,3 +47,42 @@ def test_escaped_unpaired_surrogate_rejected_before_persistence():
     source='{"case_key":"a","input":"\\ud800","expected":2}\n'
     with pytest.raises(ValueError,match="DATASET_INVALID_UNICODE"):
         parse_dataset(source,digest(source),1)
+
+
+@pytest.mark.parametrize("literal", [
+    "0.10000000000000001",
+    "1.0000000000000001",
+    "1e-999",
+    "1e999",
+    "-0.0000000000000000000000000100000000000000001",
+])
+def test_exact_dataset_rejects_lossy_binary64_numeric_literals(literal):
+    source = '{"case_key":"float","input":{},"expected":{"score":' + literal + '}}\n'
+    with pytest.raises(ValueError, match="DATASET_NUMERIC_PRECISION_LOSS|DATASET_NONFINITE_NUMBER"):
+        parse_dataset(source, digest(source), 1)
+
+
+@pytest.mark.parametrize("literal,expected", [
+    ("0.1", 0.1),
+    ("1e-7", 1e-7),
+    ("-0.00000000000000000000000001", -1e-26),
+    ("1.25", 1.25),
+    ("0.30000000000000004", 0.30000000000000004),
+])
+def test_exact_dataset_accepts_roundtripping_floats(literal, expected):
+    source = '{"case_key":"float","input":{},"expected":{"score":' + literal + '}}\n'
+    rows = parse_dataset(source, digest(source), 1)
+    assert rows[0]["expected"]["score"] == expected
+
+
+def test_lossy_golden_dataset_upload_fails_before_version_or_source_write(tmp_path):
+    store = Store(str(tmp_path / "lossy-dataset.sqlite"))
+    store.seed()
+    did = store.dataset(TENANT, "Synthetic exact golden case", USER)
+    source = '{"case_key":"a","input":{},"expected":0.10000000000000001}\n'
+    with pytest.raises(StoreError) as error:
+        store.version(TENANT, did, digest(source), 1, source_jsonl=source)
+    assert error.value.code == "DATASET_SOURCE_INVALID"
+    with store.conn() as db:
+        assert db.execute("SELECT count(*) FROM versions").fetchone()[0] == 0
+        assert db.execute("SELECT count(*) FROM dataset_sources").fetchone()[0] == 0
