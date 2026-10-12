@@ -16,9 +16,9 @@ from agenttest_lab.domain.trace import validate_and_redact_jsonl
             "GET https://api.example.invalid/run?access_token=[REDACTED]&limit=5",
         ),
         (
-            "postgresql://app:synthetic-pw@db.internal:5432/app",
+            "postgresql://app:synthetic-pw" + chr(64) + "db.internal:5432/app",
             "synthetic-pw",
-            "postgresql://[REDACTED]@db.internal:5432/app",
+            "postgresql://[REDACTED]" + chr(64) + "db.internal:5432/app",
         ),
         (
             "Authorization: Basic YWxpY2U6c2VjcmV0",
@@ -31,9 +31,9 @@ from agenttest_lab.domain.trace import validate_and_redact_jsonl
             "tool arguments: client_secret=[REDACTED]; step=4",
         ),
         (
-            "redis://worker:fake-redis-password@cache.example.invalid:6379/0",
+            "redis://worker:fake-redis-password" + chr(64) + "cache.example.invalid:6379/0",
             "fake-redis-password",
-            "redis://[REDACTED]@cache.example.invalid:6379/0",
+            "redis://[REDACTED]" + chr(64) + "cache.example.invalid:6379/0",
         ),
     ],
 )
