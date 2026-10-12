@@ -107,11 +107,6 @@ def _redact_string(value: str) -> tuple[str, int]:
         count += 1
         return _REDACTED
 
-    for pattern in (
-        _BEARER, _JWT, _HEX_SECRET, _EMAIL,
-        _GITHUB_TOKEN, _GITLAB_TOKEN, _AWS_ACCESS_KEY, _GOOGLE_API_KEY,
-    ):
-        value = pattern.sub(replace, value)
     def replace_userinfo(match: re.Match[str]) -> str:
         nonlocal count
         count += 1
@@ -125,6 +120,11 @@ def _redact_string(value: str) -> tuple[str, int]:
     value = _URL_USERINFO.sub(replace_userinfo, value)
     value = _EMBEDDED_SECRET_ASSIGNMENT.sub(replace_assignment, value)
     value = _BASIC_AUTH.sub(replace, value)
+    for pattern in (
+        _BEARER, _JWT, _HEX_SECRET, _EMAIL,
+        _GITHUB_TOKEN, _GITLAB_TOKEN, _AWS_ACCESS_KEY, _GOOGLE_API_KEY,
+    ):
+        value = pattern.sub(replace, value)
     value = _NUMERIC_FINANCIAL_ID.sub(
         lambda match: replace(match) if _valid_financial_checksum(match.group()) else match.group(),
         value,
