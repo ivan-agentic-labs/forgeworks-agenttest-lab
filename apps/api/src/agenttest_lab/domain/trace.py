@@ -25,7 +25,13 @@ _PII_KEY = re.compile(
     r"(?:^|[_-])(?:ssn|social[_-]?security(?:[_-]?(?:number|id))?|national[_-]?id|"
     r"phone(?:[_-]?number)?|mobile(?:[_-]?number)?|email(?:[_-]?address)?|"
     r"date[_-]?of[_-]?birth|dob|passport(?:[_-]?(?:number|no))?|"
-    r"ip[_-]?address|(?:client|customer|source|remote|user)[_-]?ip)(?:$|[_-])",
+    r"ip[_-]?address|(?:client|customer|source|remote|user)[_-]?ip|"
+    r"(?:first|last|full|legal)[_-]?name|"
+    r"(?:street|mailing|billing|shipping|residential)[_-]?address|"
+    r"(?:postal|zip)[_-]?code|"
+    r"bank[_-]?account(?:[_-]?(?:number|no))?|"
+    r"(?:credit[_-]?)?card[_-]?(?:number|no)|"
+    r"iban|swift[_-]?bic|routing[_-]?number|tax[_-]?id)(?:$|[_-])",
     re.IGNORECASE,
 )
 _EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
