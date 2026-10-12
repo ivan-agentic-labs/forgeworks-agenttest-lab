@@ -216,3 +216,34 @@ def test_strict_per_case_policy_rejects_unverified_external_scores(tmp_path):
     assert exc.value.code == "STRICT_POLICY_REQUIRES_EXACT_GRADER"
     with store.conn() as db:
         assert db.execute("SELECT count(*) FROM comparisons").fetchone()[0] == 0
+
+
+
+@pytest.mark.parametrize("threshold", [
+    float("nan"), float("inf"), float("-inf"), True, False,
+    "0.5", -0.1, 1.1,
+])
+def test_direct_comparison_store_rejects_untrustworthy_threshold_without_artifact(tmp_path, threshold):
+    store, version, build = setup(tmp_path, {"safe": True})
+    good = [{"case_key": "actual", "observed_output": {"safe": True}}]
+    baseline = store.run(TENANT, version, build, GRADER_SHA256, {"mode": MODE}, good)
+    candidate = store.run(TENANT, version, build, GRADER_SHA256, {"mode": MODE}, good)
+    with pytest.raises(StoreError) as error:
+        store.compare(TENANT, candidate["id"], baseline["id"],
+                      "strict-exact-no-regression-v1", threshold=threshold)
+    assert error.value.code == "INVALID_COMPARISON_THRESHOLD"
+    with store.conn() as db:
+        assert db.execute("SELECT COUNT(*) FROM comparisons").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM artifact_exports").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("threshold", [0, 0.0, 0.25, 1, 1.0])
+def test_direct_comparison_accepts_valid_finite_threshold(tmp_path, threshold):
+    store, version, build = setup(tmp_path, {"safe": True})
+    good = [{"case_key": "actual", "observed_output": {"safe": True}}]
+    baseline = store.run(TENANT, version, build, GRADER_SHA256, {"mode": MODE}, good)
+    candidate = store.run(TENANT, version, build, GRADER_SHA256, {"mode": MODE}, good)
+    comparison = store.compare(TENANT, candidate["id"], baseline["id"],
+                               "strict-exact-no-regression-v1", threshold=threshold)
+    assert comparison["verdict"] == "PASS"
+    assert comparison["threshold"] == float(threshold)
