@@ -54,7 +54,7 @@ def test_escaped_unpaired_surrogate_rejected_before_persistence():
     "1.0000000000000001",
     "1e-999",
     "1e999",
-    "-0.00000000000000000000000001",
+    "-0.0000000000000000000000000100000000000000001",
 ])
 def test_exact_dataset_rejects_lossy_binary64_numeric_literals(literal):
     source = '{"case_key":"float","input":{},"expected":{"score":' + literal + '}}\n'
@@ -65,6 +65,7 @@ def test_exact_dataset_rejects_lossy_binary64_numeric_literals(literal):
 @pytest.mark.parametrize("literal,expected", [
     ("0.1", 0.1),
     ("1e-7", 1e-7),
+    ("-0.00000000000000000000000001", -1e-26),
     ("1.25", 1.25),
     ("0.30000000000000004", 0.30000000000000004),
 ])
