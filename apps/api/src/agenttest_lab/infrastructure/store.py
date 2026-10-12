@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 import json
+import math
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -366,7 +367,15 @@ class Store:
             raise StoreError("STRICT_POLICY_REQUIRES_EXACT_GRADER", "Strict per-case regression proof requires verified exact-json grading", 409)
         if base_mode == MODE and baseline["grader_sha"] != candidate["grader_sha"]:
             raise StoreError("GRADER_IMPLEMENTATION_MISMATCH", "Exact JSON comparisons require the same grader implementation", 409)
+        # A direct store caller must not persist NaN, infinity, booleans or
+        # out-of-range thresholds in immutable comparison/signature evidence.
+        # HTTP/Pydantic validation is only the outer boundary.
+        if threshold is not None and (type(threshold) not in (int, float)
+                or not math.isfinite(threshold) or not 0 <= threshold <= 1):
+            raise StoreError("INVALID_COMPARISON_THRESHOLD", "Comparison threshold must be a finite number in [0, 1]")
         effective_threshold = float(threshold if threshold is not None else max(float(baseline["threshold"] or 0), float(candidate["threshold"] or 0)))
+        if not math.isfinite(effective_threshold) or not 0 <= effective_threshold <= 1:
+            raise StoreError("INVALID_COMPARISON_THRESHOLD", "Stored comparison threshold is invalid", 409)
         fingerprint = digest({"candidate_id": candidate_id, "baseline_id": baseline_id, "policy": policy, "threshold": effective_threshold})
         with self.conn() as db:
             if idempotency_key:
