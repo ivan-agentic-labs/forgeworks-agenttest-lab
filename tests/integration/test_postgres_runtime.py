@@ -7,6 +7,7 @@ import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict,make_conninfo
 from agenttest_lab.infrastructure.store import TENANT,USER,StoreError
+from agenttest_lab.infrastructure.security_catalog import REQUIRED_TENANT_TABLES
 from agenttest_lab.infrastructure.postgres_store import PostgresStore, ROLE
 
 
@@ -49,6 +50,29 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
         db.execute('INSERT INTO memberships VALUES(%s,%s,%s,%s)',(TENANT,USER,'editor','ACTIVE'))
     info.update(user='fw_runtime_test',password='synthetic-local-runtime-test-only');runtime=make_conninfo(**info)
     with pytest.raises(ValueError,match='superuser'):PostgresStore(owner)
+    # Real PostgreSQL catalog mutations, confined to this disposable fixture.
+    # Existing RLS policy text must not hide disabled RLS or missing FORCE RLS.
+    for table in REQUIRED_TENANT_TABLES:
+        for drift, restore in [('DISABLE ROW LEVEL SECURITY', 'ENABLE ROW LEVEL SECURITY'),
+                               ('NO FORCE ROW LEVEL SECURITY', 'FORCE ROW LEVEL SECURITY')]:
+            with psycopg.connect(owner) as migration:
+                migration.execute(psycopg.sql.SQL('ALTER TABLE {} ' + drift).format(
+                    psycopg.sql.Identifier(table)))
+            try:
+                with pytest.raises(ValueError, match='RUNTIME_TENANT_RLS_REQUIRED'):
+                    PostgresStore(runtime)
+            finally:
+                with psycopg.connect(owner) as migration:
+                    migration.execute(psycopg.sql.SQL('ALTER TABLE {} ' + restore).format(
+                        psycopg.sql.Identifier(table)))
+    with psycopg.connect(owner) as migration:
+        migration.execute('ALTER TABLE memberships RENAME TO fw_memberships_drift_probe')
+    try:
+        with pytest.raises(ValueError, match='RUNTIME_TENANT_TABLES_REQUIRED'):
+            PostgresStore(runtime)
+    finally:
+        with psycopg.connect(owner) as migration:
+            migration.execute('ALTER TABLE fw_memberships_drift_probe RENAME TO memberships')
     store=PostgresStore(runtime)
     assert store.member_role(TENANT, USER) == 'editor'
     # Verify an actual status change revokes authorization immediately.

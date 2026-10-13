@@ -17,6 +17,7 @@ from uuid import UUID, uuid4
 import psycopg
 from psycopg.rows import dict_row
 
+from agenttest_lab.infrastructure.security_catalog import verify_tenant_catalog
 from agenttest_lab.infrastructure.store import Store
 
 TENANT_CONTEXT = ContextVar("agenttest_tenant", default=None)
@@ -103,9 +104,10 @@ class PostgresStore(Store):
             attributes = db.execute("SELECT rolsuper, rolbypassrls, rolcanlogin, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname=%s", (ROLE,)).fetchone()
             if not attributes or any(attributes.values()):
                 raise ValueError("Tenant group role must be NOLOGIN, NOSUPERUSER and NOBYPASSRLS")
-            if not db.execute("SELECT 1 FROM information_schema.columns WHERE table_name='evaluation_runs' AND column_name='grader_config_json'").fetchone():
+            verify_tenant_catalog(db)
+            if not db.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='evaluation_runs' AND column_name='grader_config_json'").fetchone():
                 raise ValueError("Apply migration 002 with the migration role before starting runtime")
-            if not db.execute("SELECT 1 FROM information_schema.tables WHERE table_name='dataset_sources'").fetchone():
+            if not db.execute("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='dataset_sources'").fetchone():
                 raise ValueError("Apply migration 003 before starting runtime")
             if db.execute("SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tablename='dataset_sources' AND tableowner IN (current_user, %s)", (ROLE,)).fetchone():
                 raise ValueError("Runtime must not own dataset source tables")
