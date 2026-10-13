@@ -3,6 +3,7 @@ from agenttest_lab.presentation.authentication import decode_bearer, verify_sess
 from agenttest_lab.presentation.role_policy import role_scope_allowed
 
 import os
+from contextlib import asynccontextmanager
 import hashlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -137,7 +138,19 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         store = Store(db_path or os.getenv("AGENTTEST_DB_PATH", str(ROOT / ".runtime/agenttest.db")))
     if seed:
         store.seed()
-    app = FastAPI(title="AgentTest Lab MVP", version="0.2.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        start_pool = getattr(store, "start_pool", None)
+        if start_pool:
+            start_pool()
+        try:
+            yield
+        finally:
+            close_store = getattr(store, "close", None)
+            if close_store:
+                close_store()
+
+    app = FastAPI(title="AgentTest Lab MVP", version="0.2.0", lifespan=lifespan)
     from agenttest_lab.presentation.body_budget import BodyBudgetMiddleware
     app.add_middleware(BodyBudgetMiddleware)
     from agenttest_lab.presentation.operations import register_operations
