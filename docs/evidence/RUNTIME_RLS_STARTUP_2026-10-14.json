@@ -1,0 +1,62 @@
+{
+  "schema": "forgeworks-runtime-rls-startup-evidence-v1",
+  "date": "2026-10-14",
+  "product": "agenttest-lab",
+  "implementation_commit": "8a0c5e0c19fa0ae2fd01c69b98b2e8bd8d3e9082",
+  "changes": [
+    "Require every runtime tenant table in the active schema",
+    "Reject disabled RLS or missing FORCE RLS before runtime initialization",
+    "Scope legacy information_schema migration checks to the active schema"
+  ],
+  "ci": [
+    {
+      "name": "AgentTest Staging Public Readiness",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38461677881"
+    },
+    {
+      "name": "G1 Contract Verification",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38461677765"
+    },
+    {
+      "name": "AgentTest MVP Application CI",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38461677804"
+    },
+    {
+      "name": "AgentTest PostgreSQL Runtime Proof",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38461677965"
+    }
+  ],
+  "disposable_proof": "Each required table has RLS disabled and FORCE RLS removed in turn; startup must reject each drift; missing memberships table is also rejected; protections restored in finally. PostgreSQL runtime CI passed.",
+  "hosted_supabase": {
+    "project_ref": "fljekuwplgkrpdoajyhn",
+    "catalog_tables": 62,
+    "rls_and_force_rls_tables": 62,
+    "scope": "Read-only catalog across the five product schemas; runtime role SET ROLE denied by connector. No new authenticated tenant isolation proof."
+  },
+  "railway": {
+    "project_id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
+    "environment_id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
+    "pending_patch": "606aebb5-0fe6-4980-8135-8396d4ef67d7",
+    "source_pin": "8a0c5e0c19fa0ae2fd01c69b98b2e8bd8d3e9082",
+    "release_sha": "8a0c5e0c19fa0ae2fd01c69b98b2e8bd8d3e9082",
+    "status": "STAGED_NOT_DEPLOYED",
+    "blocking_tool_result": "Cancelled — the user did not approve this action. No changes were made.",
+    "live_health": "All five healthz and readyz endpoints returned 200; currently running older releases."
+  },
+  "remaining": [
+    "Approve prepared Railway environment patch, then verify deployed revision and manifest",
+    "Hosted authenticated product acceptance and tenant isolation",
+    "Supabase leaked-password protection warning remains open",
+    "Unified portal, representative SLO, hosted DR and production acceptance remain open"
+  ],
+  "production_acceptance": "NOT_ACCEPTED",
+  "excluded_project": "SealAngel"
+}
