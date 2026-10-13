@@ -1212,6 +1212,7 @@ components:
         grade_status:
           type: string
         score:
+          description: Scores in newly created runs are rounded to four decimal places using ROUND_HALF_EVEN; exact-json-v1 scores remain 0.0 or 1.0. Historical runs are not backfilled and may retain greater precision.
           type:
           - number
           - 'null'
@@ -1258,6 +1259,7 @@ components:
         missing_case_count:
           type: integer
         delta_score:
+          description: New comparisons normalize paired case scores to four decimal places, use their unrounded mean delta for threshold decisions, and expose the mean delta rounded to four decimal places using ROUND_HALF_EVEN. Historical comparison records are unchanged.
           type: number
         policy_version:
           type: string
@@ -1458,6 +1460,7 @@ components:
           - TIMEOUT
           - INVALID_RESULT
         score:
+          description: In external-scores mode, values for newly created runs are persisted rounded to four decimal places using ROUND_HALF_EVEN. Ignored in exact-json-v1 mode.
           type:
           - number
           - 'null'

@@ -1,5 +1,5 @@
 """Actual disposable PostgreSQL evaluation/export/signature/concurrency and RLS proof."""
-import base64,hashlib,os
+import base64,hashlib,json,os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from uuid import uuid4
@@ -108,6 +108,15 @@ def test_postgres_versions_evaluation_comparison_signature_and_tenant_isolation(
     custom_version=store.version(TENANT,dataset,hashlib.sha256(custom_source.encode()).hexdigest(),1,source_jsonl=custom_source)
     custom_run=store.run(TENANT,custom_version,build,'d'*64,results=[{'case_key':'verified.custom','status':'PASS','score':1.0}])
     assert store.cases(TENANT,custom_run['id'])[0]['case_key']=='verified.custom'
+    precision_baseline=store.run(TENANT,custom_version,build,'d'*64,results=[{'case_key':'verified.custom','status':'PASS','score':0.12344}])
+    precision_candidate=store.run(TENANT,custom_version,build,'d'*64,results=[{'case_key':'verified.custom','status':'PASS','score':0.12346}])
+    assert store.cases(TENANT,precision_baseline['id'])[0]['score']==0.1234
+    assert store.cases(TENANT,precision_candidate['id'])[0]['score']==0.1235
+    precision_comparison=store.compare(TENANT,precision_candidate['id'],precision_baseline['id'],'precision-policy')
+    assert precision_comparison['delta']==0.0001
+    with store.conn(TENANT) as db:
+        precision_export=db.execute('SELECT binding_json FROM artifact_exports WHERE tenant_id=? AND comparison_id=?',(TENANT,precision_comparison['id'])).fetchone()
+    assert json.loads(precision_export['binding_json'])['delta']==0.0001
     from agenttest_lab.domain.exact_grader import MODE, GRADER_SHA256
     exact = store.run(TENANT, custom_version, build, GRADER_SHA256, {'mode': MODE},
         [{'case_key':'verified.custom', 'observed_output':'wrong', 'status':'PASS', 'score':1.0}])

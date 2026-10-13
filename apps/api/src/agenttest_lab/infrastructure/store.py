@@ -7,6 +7,7 @@ import math
 import sqlite3
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -17,6 +18,7 @@ from agenttest_lab.domain.exact_grader import MODE, GRADER_SHA256, validate_outp
 TENANT = "00000000-0000-0000-0000-000000000001"
 USER = "00000000-0000-0000-0000-000000000010"
 SHA256 = r"^[0-9a-f]{64}$"
+SCORE_QUANTUM = Decimal("0.0001")
 
 
 def now() -> str:
@@ -31,10 +33,45 @@ def digest(value: Any) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
+def _normalized_score(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        score = Decimal(str(value))
+        if not score.is_finite() or score < 0 or score > 1:
+            return None
+        normalized = score.quantize(SCORE_QUANTUM, rounding=ROUND_HALF_EVEN)
+    except (InvalidOperation, ValueError, OverflowError):
+        return None
+    return 0.0 if normalized.is_zero() else float(normalized)
+
+
+def _rounded_delta(candidate_scores: list[float], baseline_scores: list[float]) -> tuple[Decimal, float]:
+    if not candidate_scores or not baseline_scores:
+        return Decimal("-1"), -1.0
+    candidate_mean = sum(Decimal(str(score)) for score in candidate_scores) / Decimal(len(candidate_scores))
+    baseline_mean = sum(Decimal(str(score)) for score in baseline_scores) / Decimal(len(baseline_scores))
+    decision_delta = candidate_mean - baseline_mean
+    stored_delta = decision_delta.quantize(SCORE_QUANTUM, rounding=ROUND_HALF_EVEN)
+    return decision_delta, 0.0 if stored_delta.is_zero() else float(stored_delta)
+
+
 class StoreError(ValueError):
     def __init__(self, code: str, detail: str, status: int = 422):
         self.code, self.detail, self.status = code, detail, status
         super().__init__(detail)
+
+
+def _comparison_scores(rows: Iterable[Any]) -> list[float]:
+    scores = []
+    for row in rows:
+        if row["score"] is None:
+            continue
+        normalized = _normalized_score(row["score"])
+        if normalized is None:
+            raise StoreError("INVALID_STORED_SCORE", "Stored score cannot be normalized for comparison", 409)
+        scores.append(normalized)
+    return scores
 
 
 class Store:
@@ -300,7 +337,8 @@ class Store:
                 else:
                     status = str(item.get("status", item.get("grade_status", "INVALID_RESULT"))).upper()
                     raw_score = item.get("score")
-                    valid_score = isinstance(raw_score, (int, float)) and not isinstance(raw_score, bool) and 0 <= float(raw_score) <= 1
+                    normalized_score = _normalized_score(raw_score)
+                    valid_score = normalized_score is not None
                     if mode == MODE:
                         score, error_code = None, None
                     elif status in {"MISSING", "TIMEOUT"}:
@@ -308,7 +346,7 @@ class Store:
                     elif status not in {"PASS", "FAIL"} or not valid_score:
                         status, score, error_code, complete = "INVALID_RESULT", None, "INVALID_RESULT", False
                     else:
-                        score, error_code = float(raw_score), None
+                        score, error_code = normalized_score, None
                         if status != "PASS": complete = False
                     if mode == MODE:
                         if "observed_output" not in item:
@@ -406,9 +444,10 @@ class Store:
         paired_keys = sorted(set(base_map) & set(candidate_map))
         terminal_statuses = {"MISSING", "TIMEOUT", "INVALID_RESULT"}
         missing = len(set(base_map) ^ set(candidate_map)) + sum(1 for key in paired_keys if base_map[key]["grade_status"] in terminal_statuses or candidate_map[key]["grade_status"] in terminal_statuses)
-        base_scores = [float(base_map[key]["score"]) for key in paired_keys if base_map[key]["score"] is not None]
-        candidate_scores = [float(candidate_map[key]["score"]) for key in paired_keys if candidate_map[key]["score"] is not None]
-        delta = (sum(candidate_scores) / len(candidate_scores) - sum(base_scores) / len(base_scores)) if base_scores and candidate_scores else -1.0
+        # Normalize legacy rows at comparison time as well; never rewrite historical evidence.
+        base_scores = _comparison_scores(base_map[key] for key in paired_keys)
+        candidate_scores = _comparison_scores(candidate_map[key] for key in paired_keys)
+        decision_delta, delta = _rounded_delta(candidate_scores, base_scores)
         bad_status = any(row["grade_status"] in terminal_statuses for row in (*base_cases, *candidate_cases))
         # Mean scores can hide an individual regression (1,0 -> 0,1).
         # This opt-in policy checks each *verified exact-json* case independently
@@ -424,7 +463,7 @@ class Store:
                     regressed += 1
                 elif baseline_case["grade_status"] == "PASS" and candidate_case["grade_status"] != "PASS":
                     regressed += 1
-        verdict = "PASS" if missing == 0 and not bad_status and delta >= -effective_threshold and (not strict_policy or regressed == 0) else "FAIL"
+        verdict = "PASS" if missing == 0 and not bad_status and decision_delta >= -Decimal(str(effective_threshold)) and (not strict_policy or regressed == 0) else "FAIL"
         binding = {
             "baseline_run_id": baseline_id, "candidate_run_id": candidate_id,
             "dataset_version_id": baseline["version_id"], "baseline_build_id": baseline["build_id"],
