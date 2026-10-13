@@ -1,6 +1,6 @@
 # Score precision change advisory — 2026-10-13
 
-**Status:** candidate implementation on `agent/agenttest-four-decimal-score-precision`; independent review reports no remaining findings. Exact-head CI and owner acceptance remain pending. This is not G1-E closure or production acceptance.
+**Status:** candidate implementation on `agent/agenttest-four-decimal-score-precision`; independent review reports no remaining findings. Code commit `ec3aae36812fdc126d8627dc6dbbecd2affe5855` passed all three GitHub checks, including the disposable PostgreSQL runtime test. This is not G1-E closure or production acceptance.
 
 ## Scope and policy boundary
 
@@ -13,10 +13,11 @@ No historical data is backfilled: older case reads may retain their original pre
 ## Verification receipt
 
 - Full local Python suite: **490 passed, 1 skipped**. The single skip is the disposable PostgreSQL integration test because no local disposable database was available.
+- GitHub PR #38 on code head `ec3aae36812fdc126d8627dc6dbbecd2affe5855`: **3/3 checks passed**. The PostgreSQL runtime job executed `python -W error -m pytest tests/integration/test_postgres_runtime.py -q` and reported **1 passed in 1.62s** (not skipped).
 - New tests cover half-even positive/negative ties, fail-closed threshold behavior, four-decimal persistence, HTTP readback, signed/exported delta, legacy rows without backfill, and exclusion of unpaired historical case rows from means.
-- The PostgreSQL runtime test was extended to verify normalized persisted scores and exported delta. Its local execution remains skipped; the dedicated GitHub Actions disposable-PostgreSQL check must run on the exact PR head before merge.
 - `verify_bootstrap.py`: **PASS**, 193 files scanned. `verify_contracts.py`: **PASS**, 13 operations. Independent OpenAPI validator: **PASS**. Generated SDK strict TypeScript check: **PASS**. Browser-session Node tests: **3 passed**. `git diff --check`: **PASS**.
+- A documentation-only receipt commit follows the verified code commit; its new PR head must also finish all checks before any merge.
 
 ## Risks and remaining gates
 
-At the half-even boundary, the displayed/exported four-decimal delta can be zero while the verdict is FAIL because the threshold decision correctly uses the unrounded mean. Historical case reads can also expose more than four decimals until those old runs age out; comparisons normalize their paired values without rewriting them. If the owner specifies a different tie convention, it requires compatibility and signed-evidence review. There is no database migration. Human rubric review, owner confirmation of the numeric convention, exact-head PostgreSQL CI, and all production gates remain open.
+At the half-even boundary, the displayed/exported four-decimal delta can be zero while the verdict is FAIL because the threshold decision correctly uses the unrounded mean. Historical case reads can also expose more than four decimals until those old runs age out; comparisons normalize their paired values without rewriting them. If the owner specifies a different tie convention, it requires compatibility and signed-evidence review. There is no database migration. Human rubric review, owner confirmation of the numeric convention, current-head CI, and all production gates remain open.
