@@ -288,6 +288,7 @@ export interface components {
             run_id: string;
             case_key: string;
             grade_status: string;
+            /** @description Scores in newly created runs are rounded to four decimal places using ROUND_HALF_EVEN; exact-json-v1 scores remain 0.0 or 1.0. Historical runs are not backfilled and may retain greater precision. */
             score: number | null;
             grader_sha256: string;
             trace_digest: string;
@@ -305,6 +306,7 @@ export interface components {
             candidate_run_id: string;
             paired_case_count: number;
             missing_case_count: number;
+            /** @description New comparisons normalize paired case scores to four decimal places, use their unrounded mean delta for threshold decisions, and expose the mean delta rounded to four decimal places using ROUND_HALF_EVEN. Historical comparison records are unchanged. */
             delta_score: number;
             policy_version: string;
             threshold?: number;
@@ -367,28 +369,29 @@ export interface components {
             threshold?: number;
         };
         GraderConfig: {
-            threshold?: number;
-            seed?: number;
-            seed_source?: string;
             /**
              * @description Exact JSON computes grades from verified dataset expected values; external-scores accepts caller grades.
              * @default external-scores
              * @enum {string}
              */
             mode: "external-scores" | "exact-json-v1";
+            threshold?: number;
+            seed?: number;
+            seed_source?: string;
         } & {
             [key: string]: unknown;
         };
         CaseResultInput: {
+            /** @description JSON output for exact-json-v1. Explicit null is an output; omission is missing. Caller status/score are ignored in exact mode. */
+            observed_output?: unknown;
             case_key: string;
             /** @enum {string} */
             status?: "PASS" | "FAIL" | "MISSING" | "TIMEOUT" | "INVALID_RESULT";
+            /** @description In external-scores mode, values for newly created runs are persisted rounded to four decimal places using ROUND_HALF_EVEN. Ignored in exact-json-v1 mode. */
             score?: number | null;
             /** @description UTF-8 trace with a 1 MiB encoded-byte limit; records must match the result case key. */
             trace_jsonl?: string;
             trace_digest?: string;
-            /** @description JSON output for exact-json-v1. Explicit null is an output; omission is missing. Caller status/score are ignored in exact mode. */
-            observed_output?: unknown;
         };
         ComparisonBinding: {
             /** Format: uuid */

@@ -12,4 +12,6 @@ Comparisons require the same grading mode. Exact JSON comparisons also require t
 
 The default `external-scores` mode preserves existing integrations that submit externally calculated grades. This mode does not validate their grader computation. Metadata-only fixture versions and synthetic result fallback are never accepted for exact grading.
 
+Scores in newly created runs use four decimal places with deterministic decimal `ROUND_HALF_EVEN`; exact-json outputs remain exactly `0.0` or `1.0`. Historical case rows are not backfilled, so case reads for those runs may retain greater precision. New comparisons normalize paired historical and new case scores to four decimal places, evaluate the threshold using the unrounded mean of those normalized paired scores, and store/sign the mean delta rounded to four decimal places. Existing comparison records remain unchanged. This precision rule does not select a regression policy or change any policy threshold.
+
 This feature grades caller-recorded outputs. It does not prove an agent actually generated them, connect to an agent provider, or establish that the reference dataset is objectively correct. Build and dataset provenance still need independent ownership controls. Live isolated agent execution remains a separate unfinished integration.
