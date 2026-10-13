@@ -2,12 +2,12 @@
 
 | Test ID | Scenario | Fixture / setup | Expected acceptance result | Execution |
 |---|---|---|---|---|
-| EV-T01 | Dataset hash differs between runs | different version | comparability blocked | NOT RUN |
-| EV-T02 | Missing baseline paired cases | mismatched case IDs | coverage flagged; no pass verdict | NOT RUN |
-| EV-T03 | PII embedded in agent trace | secret fixture | redact/quarantine before log | NOT RUN |
-| EV-T04 | AI judge disagrees with labeled corpus | adjudicated gold labels | calibration error reported | NOT RUN |
-| EV-T05 | Tool call arguments invalid | malformed JSONL | schema rejection with location | NOT RUN |
-| EV-T06 | Duplicate CI publish | retry after timeout | one logical verdict or safe reconcile | NOT RUN |
+| EV-T01 | Dataset hash differs between runs | different version | comparability blocked | **PASS_LOCAL** — `APP_ENV=test python -W error -m pytest tests/resilience/test_worker_reliability.py::test_comparison_rejects_mutated_or_different_immutable_dataset_version -q`; disposable SQLite/API fixture rejects different immutable version hashes. No external dataset or hosted comparison. |
+| EV-T02 | Missing baseline paired cases | mismatched case IDs | coverage flagged; no pass verdict | **PASS_LOCAL** — `APP_ENV=test python -W error -m pytest tests/eval/test_plan_local.py -q` (`test_missing_baseline_pair_is_coverage_gap_and_fails_comparison`); synthetic exact-JSON run records the omitted case as `MISSING` and comparison exports `FAIL`. No production corpus. |
+| EV-T03 | PII embedded in agent trace | secret fixture | redact/quarantine before log | **PASS_LOCAL** — `APP_ENV=test python -W error -m pytest tests/unit/test_trace_boundaries.py -k 'nested_structured_pii_fields_are_redacted_before_hashing or provider_credentials_are_redacted_in_neutral_trace_fields' -q`; synthetic trace redaction removes structured PII/provider credentials before the redacted digest. This does not validate a production log sink. |
+| EV-T04 | AI judge disagrees with labeled corpus | adjudicated gold labels | calibration error reported | **NOT_RUN** — no local AI-judge/calibration boundary or adjudicated gold corpus exists; no behavior inferred or external provider called. |
+| EV-T05 | Tool call arguments invalid | malformed JSONL | schema rejection with location | **NOT_RUN** — the current repository has no implemented tool-argument JSONL schema boundary with a location-bearing rejection contract; no substitute trace test is claimed. |
+| EV-T06 | Duplicate CI publish | retry after timeout | one logical verdict or safe reconcile | **PARTIAL_LOCAL** — `APP_ENV=test python -W error -m pytest tests/integration/test_hardening.py::test_comparison_binds_versions_and_creates_export_artifact -q`; repeated comparison idempotency key returns the same logical export and conflicting reuse is rejected. No timeout/failure-injection or external CI publisher was exercised. |
 
 ## Coverage and execution gates
 - Unit: every pure domain invariant, deterministic cross-validation, state guard, authorization policy and financial arithmetic where relevant.
