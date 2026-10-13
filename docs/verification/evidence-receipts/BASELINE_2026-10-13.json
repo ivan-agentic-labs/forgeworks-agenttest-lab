@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "record_id": "agenttest.baseline.2026-10-13",
+  "repository": "ivan-agentic-labs/forgeworks-agenttest-lab",
+  "product": "AgentTest Lab",
+  "record_type": "baseline_snapshot",
+  "recorded_on": "2026-10-14",
+  "evaluated_source_commit": "dcf2aa86485c47b45f047300ffe580d54e1375f2",
+  "gate_assessment": {
+    "g1_d": "CONDITIONAL_PENDING_SIGNOFF",
+    "g1_e": "PARTIAL_OPEN_BLOCKED",
+    "production_acceptance": "NOT_ACCEPTED"
+  },
+  "evidence": [
+    {
+      "kind": "application_ci",
+      "name": "AgentTest MVP Application CI",
+      "status": "PASS",
+      "run_id": "38428532042",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38428532042",
+      "environment": "CI",
+      "workflow_commit": "dcf2aa86485c47b45f047300ffe580d54e1375f2",
+      "subject_commit": "dcf2aa86485c47b45f047300ffe580d54e1375f2",
+      "subject_identity": "VERIFIED",
+      "scope": "Application tests, contract/OpenAPI checks, browser-session checks, and generated SDK checks for the exact checkout SHA.",
+      "limitations": ["CI success does not prove remote agent execution, customer acceptance, or production readiness."]
+    },
+    {
+      "kind": "contract_validation",
+      "name": "G1 Contract Verification",
+      "status": "PASS",
+      "run_id": "38428531990",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38428531990",
+      "environment": "CI",
+      "workflow_commit": "dcf2aa86485c47b45f047300ffe580d54e1375f2",
+      "subject_commit": "dcf2aa86485c47b45f047300ffe580d54e1375f2",
+      "subject_identity": "VERIFIED",
+      "scope": "Bootstrap, event contract, and independent OpenAPI checks for the exact checkout SHA.",
+      "limitations": ["Contract verification does not close the AgentTest product evaluation plan or independent signoff."]
+    },
+    {
+      "kind": "postgres_runtime",
+      "name": "AgentTest PostgreSQL Runtime Proof",
+      "status": "PASS",
+      "run_id": "38428531894",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38428531894",
+      "environment": "DISPOSABLE",
+      "workflow_commit": "dcf2aa86485c47b45f047300ffe580d54e1375f2",
+      "subject_commit": "dcf2aa86485c47b45f047300ffe580d54e1375f2",
+      "subject_identity": "VERIFIED",
+      "scope": "Disposable PostgreSQL migrations, tenant/RLS, concurrency, logical restore, and schema-drift checks.",
+      "limitations": ["This is not production PITR, regional failover, or operational RTO/RPO evidence."]
+    },
+    {
+      "kind": "staging_readiness",
+      "name": "AgentTest staging public readiness smoke",
+      "status": "PASS",
+      "run_id": "38428532074",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38428532074",
+      "environment": "STAGING",
+      "workflow_commit": "dcf2aa86485c47b45f047300ffe580d54e1375f2",
+      "subject_commit": null,
+      "subject_identity": "UNKNOWN",
+      "scope": "Public staging liveness/readiness and anonymous denial checks.",
+      "limitations": ["The deployed service SHA is not proven by this smoke record.", "This is not authenticated agent/customer acceptance."]
+    }
+  ],
+  "limitations": [
+    "G1-D remains conditional/pending signoff and G1-E remains partial/open/blocked.",
+    "EV-T01 through EV-T06 remain not run in the repository plan at this baseline; scoped CI does not establish remote agent execution or evaluation quality.",
+    "The staging smoke workflow commit does not identify the deployed application commit."
+  ],
+  "source_documents": [
+    {"path": "docs/verification/CURRENT_GATE_EVIDENCE.md", "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/blob/dcf2aa86485c47b45f047300ffe580d54e1375f2/docs/verification/CURRENT_GATE_EVIDENCE.md"},
+    {"path": "docs/verification/DESIGN_GATE_STATUS.md", "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/blob/dcf2aa86485c47b45f047300ffe580d54e1375f2/docs/verification/DESIGN_GATE_STATUS.md"},
+    {"path": "docs/verification/TEST_PLAN.md", "url": "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/blob/dcf2aa86485c47b45f047300ffe580d54e1375f2/docs/verification/TEST_PLAN.md"}
+  ]
+}
