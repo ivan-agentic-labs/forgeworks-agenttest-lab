@@ -235,7 +235,11 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
 
     @app.get("/v1/evaluation-runs/{rid}/cases")
     def cases(rid: UUID, c=Depends(scope("evaluation:read", store))):
-        items = [{"id": x["id"], "run_id": x["run_id"], "case_key": x["case_key"], "grade_status": x["grade_status"], "score": x["score"], "grader_sha256": x["grader_sha"], "trace_digest": x["trace_digest"], "error_code": x["error_code"]} for x in store.cases(c["tenant_id"], str(rid))]
+        try:
+            visible_cases = store.cases(c["tenant_id"], str(rid))
+        except StoreError as error:
+            handle_store_error(error)
+        items = [{"id": x["id"], "run_id": x["run_id"], "case_key": x["case_key"], "grade_status": x["grade_status"], "score": x["score"], "grader_sha256": x["grader_sha"], "trace_digest": x["trace_digest"], "error_code": x["error_code"]} for x in visible_cases]
         return {"items": items, "next_cursor": None, "has_more": False}
 
     @app.post("/v1/evaluation-runs/{rid}/comparisons", status_code=201)

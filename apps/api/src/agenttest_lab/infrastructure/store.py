@@ -385,7 +385,18 @@ class Store:
 
     def cases(self, tenant_id: str, run_id: str) -> list[sqlite3.Row]:
         with self.conn() as db:
-            return db.execute("SELECT * FROM cases WHERE tenant_id=? AND run_id=? ORDER BY case_key", (tenant_id, run_id)).fetchall()
+            # Empty case results are valid only for an EXISTING tenant-owned run.
+            # Without this visibility check, a cross-tenant run appears as 200 [].
+            visible = db.execute(
+                "SELECT 1 FROM runs WHERE tenant_id=? AND id=?",
+                (tenant_id, run_id),
+            ).fetchone()
+            if visible is None:
+                raise StoreError("RESOURCE_NOT_FOUND", "Evaluation run is not visible", 404)
+            return db.execute(
+                "SELECT * FROM cases WHERE tenant_id=? AND run_id=? ORDER BY case_key",
+                (tenant_id, run_id),
+            ).fetchall()
 
     def compare(self, tenant_id: str, candidate_id: str, baseline_id: str, policy: str, threshold: float | None = None, idempotency_key: str | None = None) -> sqlite3.Row:
         if candidate_id == baseline_id:
