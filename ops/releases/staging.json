@@ -2,18 +2,18 @@
   "schema": "forgeworks-staging-release-v1",
   "product": "agenttest-lab",
   "environment": "staging",
-  "revision_sha": "b86d396e3bf60cd1f0e324d74dcfc973c9681634",
+  "revision_sha": "9e739a048da49a2d2434fd8138d21210ddc9e7c9",
   "runtime_manifest": {
     "profile": "forgeworks-runtime-manifest-v1",
     "file_count": 37,
-    "sha256": "871d702a177f54978f1dbb4b5f577c2f0ffa12947e0fc5a4c6b3dcf9fd42f386"
+    "sha256": "d944327428a5a8967a3f6f571c54de938765a4723d8915ecbab2707e1a89e0e0"
   },
   "railway_project_id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
   "railway_environment_id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
   "railway_service_id": "f2d6c578-ffaf-4682-b81a-8bae13d9c7a3",
-  "deployment_id": "37b266b8-57b7-4b64-b823-3c1ab74e71f1",
+  "deployment_id": "9e248d73-9f7a-4ca3-9037-7a581cabbdc6",
   "deployment_status": "SUCCESS",
-  "observed_at": "2026-10-14T08:14:12Z",
+  "observed_at": "2026-10-14T09:10:08Z",
   "ci_urls": [
     "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38518470098",
     "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802",
@@ -24,17 +24,16 @@
   ],
   "hosted_probe": {
     "result": "PASS",
-    "scope": "Five-product staging identity/readiness and anonymous business/metrics denial",
-    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38533777988",
+    "scope": "Observed /healthz, /readyz, /versionz exact fingerprint and anonymous private metrics denial",
+    "observed_at": "2026-10-14T09:10:08Z",
     "private_metrics": "NOT_VERIFIED",
-    "authenticated_tenant": "NOT_VERIFIED",
-    "observed_at": "2026-10-14T08:14:12Z"
+    "authenticated_tenant": "NOT_VERIFIED"
   },
   "production_acceptance": "NOT_ACCEPTED",
   "rollback": {
-    "previous_revision_sha": "6fe6fab0e7e6950ae8d374b8a0e04e62b6477015",
-    "previous_deployment_id": "3d507141-f52f-4d5e-8249-43263b015de2",
-    "notes": "Rollback selected app version; database and object restoration must be separately reviewed."
+    "previous_revision_sha": "b86d396e3bf60cd1f0e324d74dcfc973c9681634",
+    "previous_deployment_id": "37b266b8-57b7-4b64-b823-3c1ab74e71f1",
+    "notes": "Roll back application source and matching release identity. Database rollback remains separately reviewed."
   },
   "limits": [
     "No authenticated cross-tenant or real business integration acceptance",
