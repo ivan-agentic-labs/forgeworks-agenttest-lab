@@ -2,37 +2,38 @@
   "schema": "forgeworks-staging-release-v1",
   "product": "agenttest-lab",
   "environment": "staging",
-  "revision_sha": "d05d0f2205ab4b226cb9aeeef03407156b1042d8",
+  "revision_sha": "6fe6fab0e7e6950ae8d374b8a0e04e62b6477015",
   "runtime_manifest": {
     "profile": "forgeworks-runtime-manifest-v1",
     "file_count": 37,
-    "sha256": "6a3538ee56bfc845a8bf888a235932105c0efd27ee054d86abe15c506517e553"
+    "sha256": "48bc807f65543d1b266ac47e63a9fa724241631c62bf339d2f0adf7cbff13f89"
   },
   "railway_project_id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
   "railway_environment_id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
   "railway_service_id": "f2d6c578-ffaf-4682-b81a-8bae13d9c7a3",
-  "deployment_id": "3f94f644-920c-4845-8121-787acf021140",
+  "deployment_id": "3d507141-f52f-4d5e-8249-43263b015de2",
   "deployment_status": "SUCCESS",
-  "observed_at": "2026-10-14T07:26:21Z",
+  "observed_at": "2026-10-14T07:55:55Z",
   "ci_urls": [
     "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38518470098",
     "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802",
     "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38525437249",
-    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38528406231"
+    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38528406231",
+    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38531680241"
   ],
   "hosted_probe": {
     "result": "PASS",
-    "scope": "Exact five-product staging revision, selected runtime fingerprint, health/readiness, anonymous business/metrics denial",
-    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38528406231",
+    "scope": "Exact staging runtime identity, health/readiness and denied anonymous product/metrics access",
+    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38531680241",
     "private_metrics": "NOT_VERIFIED",
     "authenticated_tenant": "NOT_VERIFIED",
-    "observed_at": "2026-10-14T07:26:21Z"
+    "observed_at": "2026-10-14T07:55:55Z"
   },
   "production_acceptance": "NOT_ACCEPTED",
   "rollback": {
-    "previous_revision_sha": "7ad8716145b883eff32fd45fb8141d3ca86a635c",
-    "previous_deployment_id": "e3c4bd1e-f37f-4e5c-8a54-6d5f2c97b551",
-    "notes": "Restore matching tested revision and deployment; schema and object data require independent rollback. Non-current deployment may need an explicit redeploy."
+    "previous_revision_sha": "d05d0f2205ab4b226cb9aeeef03407156b1042d8",
+    "previous_deployment_id": "3f94f644-920c-4845-8121-787acf021140",
+    "notes": "Rollback requires exact tested source and config; database/data restore reviewed separately."
   },
   "limits": [
     "No authenticated cross-tenant or real business integration acceptance",
