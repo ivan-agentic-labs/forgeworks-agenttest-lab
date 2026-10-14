@@ -2,7 +2,7 @@
   "schema": "forgeworks-staging-release-v1",
   "product": "agenttest-lab",
   "environment": "staging",
-  "revision_sha": "75de8e7676a79c9b72f62b85afec40653e23deae",
+  "revision_sha": "11957fe1f728cdcc932fdf5e7455d7df1e16536d",
   "runtime_manifest": {
     "profile": "forgeworks-runtime-manifest-v1",
     "file_count": 37,
@@ -11,28 +11,30 @@
   "railway_project_id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
   "railway_environment_id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
   "railway_service_id": "f2d6c578-ffaf-4682-b81a-8bae13d9c7a3",
-  "deployment_id": "978f9978-8210-4c70-a8a6-73c9483e5cd2",
+  "deployment_id": "03bac45b-9502-424e-a1c1-5fab7a307621",
   "deployment_status": "SUCCESS",
-  "observed_at": "2026-10-14T05:55:00Z",
+  "observed_at": "2026-10-14T06:18:43Z",
   "ci_urls": [
     "https://github.com/ivan-agentic-labs/forgeworks-agenttest-lab/actions/runs/38518470098",
-    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38519369397"
+    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802"
   ],
   "hosted_probe": {
     "result": "PASS",
-    "scope": "Exact five-service public identity/readiness and anonymous metrics/business boundary",
-    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38519369397",
+    "scope": "Exact fleet staging identity/readiness and anonymous access boundaries",
+    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802",
     "private_metrics": "NOT_VERIFIED",
-    "authenticated_tenant": "NOT_VERIFIED"
+    "authenticated_tenant": "NOT_VERIFIED",
+    "observed_at": "2026-10-14T06:18:43Z"
   },
   "production_acceptance": "NOT_ACCEPTED",
   "rollback": {
-    "previous_revision_sha": "6eac42d21a524b0611a54331bb304ef6ee2c4a5b",
-    "previous_deployment_id": "63e7b5d8-8d5c-497a-a84f-fe51af856ec7",
-    "notes": "Restore previous source SHA and matching FORGEWORKS_RELEASE_SHA together. Database rollback is separate."
+    "previous_revision_sha": "75de8e7676a79c9b72f62b85afec40653e23deae",
+    "previous_deployment_id": "978f9978-8210-4c70-a8a6-73c9483e5cd2",
+    "notes": "Rollback needs matching source/release SHA and verified region; rollback of schema or data is separately reviewed."
   },
   "limits": [
     "No authenticated cross-tenant or real business integration acceptance",
     "No live disaster recovery, provider audit, production SLO or privacy/legal acceptance"
-  ]
+  ],
+  "deployment_region": "asia-southeast1-eqsg3a"
 }
