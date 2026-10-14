@@ -101,3 +101,33 @@ def test_canonical_s3_endpoint_remains_valid(monkeypatch):
         monkeypatch.setenv(key, value)
     monkeypatch.setenv("S3_ENDPOINT", "https://storage.example.invalid")
     assert ObjectStorage("agenttest-lab").host == "storage.example.invalid"
+
+
+def test_supabase_s3_private_bucket_path_signed_exactly(monkeypatch):
+    values={"S3_ENDPOINT":"https://fljekuwplgkrpdoajyhn.storage.supabase.co/storage/v1/s3",
+            "S3_BUCKET":"fw-staging-agenttest-lab","S3_REGION":"ap-northeast-2",
+            "S3_URL_STYLE":"path","S3_ACCESS_KEY_ID":"synthetic-access",
+            "S3_SECRET_ACCESS_KEY":"synthetic-test-secret"}
+    for key,value in values.items(): monkeypatch.setenv(key,value)
+    store=ObjectStorage("agenttest-lab")
+    req=store.signed_request("PUT","agenttest-lab/fixture",b"bytes",
+                             datetime(2026,10,14,tzinfo=timezone.utc))
+    assert req.full_url==("https://fljekuwplgkrpdoajyhn.storage.supabase.co/storage/v1/s3/"
+                          "fw-staging-agenttest-lab/agenttest-lab/fixture")
+    assert "20261014/ap-northeast-2/s3/aws4_request" in req.get_header("Authorization")
+    assert req.get_header("X-amz-content-sha256")==hashlib.sha256(b"bytes").hexdigest()
+
+
+@pytest.mark.parametrize("endpoint,style",[
+    ("https://invalid.example/storage/v1/s3","path"),
+    ("https://fljekuwplgkrpdoajyhn.storage.supabase.co/storage/v1/s3/evil","path"),
+    ("https://fljekuwplgkrpdoajyhn.storage.supabase.co/storage/v1/s3","virtual-host"),
+    ("https://x.supabase.co/storage/v1/s3","path"),
+])
+def test_supabase_s3_disallows_foreign_prefixes(monkeypatch,endpoint,style):
+    for k,v in {"S3_ENDPOINT":endpoint,"S3_URL_STYLE":style,
+                "S3_BUCKET":"fw-staging-agenttest-lab","S3_REGION":"ap-northeast-2",
+                "S3_ACCESS_KEY_ID":"synthetic-access","S3_SECRET_ACCESS_KEY":"synthetic-test-secret"}.items():
+        monkeypatch.setenv(k,v)
+    with pytest.raises(HTTPException) as err:ObjectStorage("agenttest-lab")
+    assert err.value.status_code==503
