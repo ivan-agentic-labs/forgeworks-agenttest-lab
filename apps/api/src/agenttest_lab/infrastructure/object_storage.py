@@ -50,6 +50,11 @@ class ObjectStorage:
             and re.fullmatch(r"[a-z0-9]{20}(?:\.storage)?\.supabase\.co",parsed.hostname)
             and self.style=="path"):
             reject("STORAGE_NOT_CONFIGURED",503)
+        # A project-wide Supabase S3 key must not route between product buckets.
+        if self.prefix:
+            environment=os.environ.get("APP_ENV","development")
+            if environment in {"staging","production"} and self.bucket != f"fw-{environment}-{product}":
+                reject("STORAGE_NOT_CONFIGURED",503)
         self.host=parsed.hostname
         self.opener=urllib.request.build_opener(NoRedirect())
 
