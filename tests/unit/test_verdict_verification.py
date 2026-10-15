@@ -135,3 +135,23 @@ def test_strict_signed_pass_requires_zero_regressions(signed):
     doc["binding"] = deepcopy(binding)
     doc["regressed_case_count"] = 0
     assert verify_verdict(sign(doc), public, binding)["verdict"] == "PASS"
+
+
+@pytest.mark.parametrize("unexpected", [
+    {"verified": True},
+    {"unsigned_status": "PASS"},
+    {"claimed_score": 1.0, "debug": "trusted"},
+])
+def test_verdict_rejects_unsigned_extra_envelope_metadata(signed, unexpected):
+    public, binding, doc, sign = signed
+    injected = {**sign(doc), **unexpected}
+    with pytest.raises(VerdictVerificationError, match="VERDICT_ENVELOPE_INVALID"):
+        verify_verdict(injected, public, binding)
+
+
+def test_verdict_rejects_missing_required_envelope_field(signed):
+    public, binding, doc, sign = signed
+    incomplete = sign(doc)
+    del incomplete["signed_artifact_sha256"]
+    with pytest.raises(VerdictVerificationError, match="VERDICT_ENVELOPE_INVALID"):
+        verify_verdict(incomplete, public, binding)
