@@ -53,7 +53,13 @@ def strict_document(raw: str | bytes) -> dict:
 def verify_verdict(envelope: dict, public_key_pem: bytes, expected_binding: dict) -> dict:
     """Verify exact signed bytes; never trust a key supplied by the envelope."""
     try:
-        if not isinstance(envelope, dict) or envelope.get("signature_algorithm") != "Ed25519":
+        # A verdict envelope must contain only signed/pinned verification fields.
+        # Unknown unsigned keys could be misinterpreted as trusted metadata.
+        envelope_keys = {"signature_algorithm", "signature", "signing_key_id",
+                         "signed_payload", "signed_artifact_sha256", "verdict"}
+        if not isinstance(envelope, dict) or set(envelope) != envelope_keys:
+            raise VerdictVerificationError("VERDICT_ENVELOPE_INVALID")
+        if envelope["signature_algorithm"] != "Ed25519":
             raise VerdictVerificationError("VERDICT_ALGORITHM_INVALID")
         if not isinstance(expected_binding, dict) or not REQUIRED_BINDINGS <= expected_binding.keys():
             raise VerdictVerificationError("EXPECTED_BINDING_INCOMPLETE")
