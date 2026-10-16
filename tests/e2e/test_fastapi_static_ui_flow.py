@@ -143,3 +143,12 @@ def test_static_console_flow_blocks_missing_response_fields(tmp_path):
     assert "/cases" in javascript
     assert "/comparisons/" in javascript
     assert "/ci-verdict" in javascript
+
+def test_static_console_labels_fixture_pass_as_unverified():
+    # Statuses entered through the console are not observations from a running agent.
+    html = (ROOT / "apps/web/index.html").read_text(encoding="utf-8")
+    javascript = (ROOT / "apps/web/app.js").read_text(encoding="utf-8")
+    assert "Fixture-only result source:" in html
+    assert "FIXTURE PASS / NOT VERIFIED" in javascript
+    assert "does not execute an agent" in javascript
+    assert 'state: "pass", label: "PASS"' not in javascript
