@@ -86,3 +86,18 @@ def test_lossy_golden_dataset_upload_fails_before_version_or_source_write(tmp_pa
     with store.conn() as db:
         assert db.execute("SELECT count(*) FROM versions").fetchone()[0] == 0
         assert db.execute("SELECT count(*) FROM dataset_sources").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("source", [
+    "invalid" + chr(0xD800) + "case",
+    "invalid" + chr(0xDFFF) + "case",
+])
+def test_actual_unpaired_unicode_is_typed_dataset_failure(source):
+    with pytest.raises(ValueError, match="DATASET_INVALID_UNICODE"):
+        parse_dataset(source, "0" * 64, 1)
+
+
+@pytest.mark.parametrize("source", [None, b"not-a-text-dataset", ["not", "jsonl"]])
+def test_nontext_dataset_source_fails_with_stable_error(source):
+    with pytest.raises(ValueError, match="DATASET_SOURCE_INVALID"):
+        parse_dataset(source, "0" * 64, 1)
