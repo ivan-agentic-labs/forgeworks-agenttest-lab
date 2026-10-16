@@ -5,6 +5,7 @@ from agenttest_lab.presentation.role_policy import role_scope_allowed
 import os
 from contextlib import asynccontextmanager
 import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -246,6 +247,35 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         except StoreError as error:
             handle_store_error(error)
         return {"id": row["id"], "status": row["status"], "created_at": row["created_at"], "dataset_version_id": row["version_id"], "agent_build_id": row["build_id"], "grader_sha256": row["grader_sha"], "grader_config_sha256": row["grader_config_sha"], "threshold": row["threshold"], "seed": row["seed"], "seed_source": row["seed_source"], "job_id": row["job_id"]}
+
+    @app.get("/v1/evaluation-runs/{rid}/summary")
+    def evaluation_summary(rid: UUID, c=Depends(scope("evaluation:read", store))):
+        """Summarize stored grading evidence without claiming agent execution."""
+        run = store._run_row(c["tenant_id"], str(rid))
+        if run is None:
+            reject(404, "RESOURCE_NOT_FOUND", "Evaluation run is not visible")
+        try:
+            items = store.cases(c["tenant_id"], str(rid))
+        except StoreError as error:
+            handle_store_error(error)
+        counts = {"PASS": 0, "FAIL": 0, "MISSING": 0, "TIMEOUT": 0, "INVALID_RESULT": 0}
+        for item in items:
+            status = item["grade_status"]
+            counts[status] = counts.get(status, 0) + 1
+        mode = json.loads(run["grader_config_json"]).get("mode", "external-scores")
+        return {
+            "run_id": run["id"],
+            "status": run["status"],
+            "grader_mode": mode,
+            "result_source": (
+                "COMPUTED_FROM_CALLER_SUPPLIED_OBSERVATIONS" if mode == "exact-json-v1"
+                else "CALLER_SUPPLIED_SCORES_UNVERIFIED"
+            ),
+            "executes_agent": False,
+            "expected_case_count": run["expected_case_count"],
+            "recorded_case_count": len(items),
+            "counts": counts,
+        }
 
     @app.get("/v1/evaluation-runs/{rid}/cases")
     def cases(rid: UUID, c=Depends(scope("evaluation:read", store))):
