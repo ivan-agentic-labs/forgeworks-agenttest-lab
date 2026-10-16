@@ -247,3 +247,18 @@ def test_direct_comparison_accepts_valid_finite_threshold(tmp_path, threshold):
                                "strict-exact-no-regression-v1", threshold=threshold)
     assert comparison["verdict"] == "PASS"
     assert comparison["threshold"] == float(threshold)
+
+def test_http_exposes_installed_grader_identity_without_agent_execution(tmp_path):
+    with TestClient(create_app(str(tmp_path / "identity.db"), seed=True)) as client:
+        unauthenticated = client.get("/v1/grader/identity")
+        assert unauthenticated.status_code in (401, 403)
+        forbidden = client.get("/v1/grader/identity", headers=h("evaluation:run"))
+        assert forbidden.status_code == 403
+        response = client.get("/v1/grader/identity", headers=h("evaluation:read"))
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "mode": MODE,
+            "grader_sha256": GRADER_SHA256,
+            "result_source": "CALLER_SUPPLIED_OBSERVATIONS",
+            "executes_agent": False,
+        }
