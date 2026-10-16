@@ -262,3 +262,42 @@ def test_http_exposes_installed_grader_identity_without_agent_execution(tmp_path
             "result_source": "CALLER_SUPPLIED_OBSERVATIONS",
             "executes_agent": False,
         }
+
+def test_summary_exposes_computed_case_evidence_not_agent_execution(tmp_path):
+    store, version, build = setup(tmp_path, {"result": "safe"})
+    with TestClient(create_app(str(tmp_path / "exact.db"), seed=True)) as client:
+        result = client.post("/v1/evaluation-runs", headers=h("evaluation:run"), json={
+            "dataset_version_id": version,
+            "agent_build_id": build,
+            "grader_sha256": GRADER_SHA256,
+            "grader_config": {"mode": MODE},
+            "case_results": [{"case_key": "actual", "observed_output": {"result": "safe"}}],
+        })
+        assert result.status_code == 202, result.text
+        run_id = result.json()["id"]
+        summary = client.get(f"/v1/evaluation-runs/{run_id}/summary", headers=h("evaluation:read"))
+        assert summary.status_code == 200, summary.text
+        body = summary.json()
+        assert body["status"] == "SUCCEEDED"
+        assert body["result_source"] == "COMPUTED_FROM_CALLER_SUPPLIED_OBSERVATIONS"
+        assert body["executes_agent"] is False
+        assert body["recorded_case_count"] == 1
+        assert body["expected_case_count"] == 1
+        assert body["counts"]["PASS"] == 1
+        assert client.get(f"/v1/evaluation-runs/{run_id}/summary",
+                          headers=h("evaluation:run")).status_code == 403
+        assert client.get("/v1/evaluation-runs/00000000-0000-0000-0000-000000000099/summary",
+                          headers=h("evaluation:read")).status_code == 404
+
+
+def test_summary_never_labels_external_scores_as_verified(tmp_path):
+    store, version, build = setup(tmp_path, 1)
+    row = store.run(TENANT, version, build, "d" * 64, results=[
+        {"case_key": "actual", "status": "PASS", "score": 1}
+    ])
+    with TestClient(create_app(str(tmp_path / "exact.db"), seed=True)) as client:
+        summary = client.get(f"/v1/evaluation-runs/{row['id']}/summary",
+                             headers=h("evaluation:read"))
+        assert summary.status_code == 200
+        assert summary.json()["result_source"] == "CALLER_SUPPLIED_SCORES_UNVERIFIED"
+        assert summary.json()["counts"]["PASS"] == 1
