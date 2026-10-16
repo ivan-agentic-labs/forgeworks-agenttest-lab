@@ -220,6 +220,20 @@ def create_app(db_path: str | None = None, seed: bool = False) -> FastAPI:
         bid = store.build(c["tenant_id"], body.name, body.build_sha256, body.tool_manifest_sha256, body.prompt_version)
         return {"id": bid, "status": "REGISTERED", "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "name": body.name, "build_sha256": body.build_sha256, "tool_manifest_sha256": body.tool_manifest_sha256, "prompt_version": body.prompt_version}
 
+    @app.get("/v1/grader/identity")
+    def grader_identity(c=Depends(scope("evaluation:read", store))):
+        """Publish the installed deterministic grader identity for exact-json runs.
+
+        The API only grades submitted observed outputs; it does not execute agents.
+        """
+        from agenttest_lab.domain.exact_grader import MODE, GRADER_SHA256
+        return {
+            "mode": MODE,
+            "grader_sha256": GRADER_SHA256,
+            "result_source": "CALLER_SUPPLIED_OBSERVATIONS",
+            "executes_agent": False,
+        }
+
     @app.post("/v1/evaluation-runs", status_code=202)
     def run(body: Run, c=Depends(scope("evaluation:run", store)), idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None):
         config = body.grader_config.model_dump(exclude_none=True) if body.grader_config else {}
