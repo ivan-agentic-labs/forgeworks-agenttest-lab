@@ -70,6 +70,7 @@
     }));
   }
 
+  // Bounded fixture identities for the local console only. Not cryptographic digests of a real agent build.
   function sha(char) { return char.repeat(64); }
 
   function assertResponseFields(body, fields, label) {
@@ -103,7 +104,8 @@
       "Baseline run": verdict.binding && verdict.binding.baseline_run_id,
       "Candidate run": verdict.binding && verdict.binding.candidate_run_id,
       "Policy": verdict.policy_version,
-      "Artifact SHA-256": verdict.signed_artifact_sha256
+      "Artifact SHA-256": verdict.signed_artifact_sha256,
+      "Result provenance": "User-entered case statuses; no agent execution"
     };
     for (const [label, value] of Object.entries(values)) {
       const wrapper = document.createElement("div");
@@ -130,7 +132,7 @@
     if (verdict.verdict !== "PASS") {
       return { state: "fail", label: `FAIL / ${verdict.verdict || "INVALID"}`, summary: "The signed API verdict is not PASS. The console preserves the failure." };
     }
-    return { state: "pass", label: "PASS", summary: "Signed PASS: complete case coverage and no fail-closed terminal statuses were observed." };
+    return { state: "blocked", label: "FIXTURE PASS / NOT VERIFIED", summary: "The API policy accepted submitted case statuses, but this console does not execute an agent or measure agent output. This is not a verified agent evaluation or production release approval." };
   }
 
   async function runFlow() {
