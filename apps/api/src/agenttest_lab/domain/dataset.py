@@ -9,7 +9,12 @@ MAX_BYTES = 1_048_576
 
 
 def parse_dataset(source: str, expected_sha: str, expected_count: int) -> list[dict]:
-    raw = source.encode("utf-8")
+    if not isinstance(source, str):
+        raise ValueError("DATASET_SOURCE_INVALID")
+    try:
+        raw = source.encode("utf-8", errors="strict")
+    except UnicodeError as error:
+        raise ValueError("DATASET_INVALID_UNICODE") from error
     if not raw or len(raw) > MAX_BYTES:
         raise ValueError("DATASET_SOURCE_BUDGET_EXCEEDED")
     if hashlib.sha256(raw).hexdigest() != expected_sha:
