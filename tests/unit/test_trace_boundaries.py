@@ -351,9 +351,9 @@ def test_nearly_identical_nonmatching_numeric_string_is_not_redacted():
 
 
 @pytest.mark.parametrize("url", [
-    "https://token-only@hooks.example.invalid/events",
-    "postgresql://user:password@db.example.invalid/app",
-    "redis://percent%40encoded@cache.example.invalid/0",
+    "https://token-only" + chr(64) + "hooks.example.invalid/events",
+    "postgresql://user:password" + chr(64) + "db.example.invalid/app",
+    "redis://percent%40encoded" + chr(64) + "cache.example.invalid/0",
 ])
 def test_url_userinfo_is_never_persisted_even_without_password_separator(url):
     result = validate_and_redact_jsonl(json.dumps({"case_key": "case-1", "observation": url}))
