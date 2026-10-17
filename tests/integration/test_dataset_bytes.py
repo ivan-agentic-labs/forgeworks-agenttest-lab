@@ -101,3 +101,17 @@ def test_actual_unpaired_unicode_is_typed_dataset_failure(source):
 def test_nontext_dataset_source_fails_with_stable_error(source):
     with pytest.raises(ValueError, match="DATASET_SOURCE_INVALID"):
         parse_dataset(source, "0" * 64, 1)
+
+
+def test_oversized_json_integer_has_stable_validation_error():
+    literal = "9" * 5000
+    source = '{"case_key":"large-int","input":{},"expected":' + literal + '}\n'
+    with pytest.raises(ValueError, match="DATASET_INTEGER_BUDGET_EXCEEDED"):
+        parse_dataset(source, digest(source), 1)
+
+
+def test_large_but_bounded_exact_json_integer_is_accepted():
+    literal = "9" * 128
+    source = '{"case_key":"bounded-int","input":{},"expected":' + literal + '}\n'
+    rows = parse_dataset(source, digest(source), 1)
+    assert rows[0]["expected"] == int(literal)
