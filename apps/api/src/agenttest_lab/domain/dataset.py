@@ -41,6 +41,13 @@ def parse_dataset(source: str, expected_sha: str, expected_count: int) -> list[d
         except (OverflowError, InvalidOperation) as error:
             raise ValueError("DATASET_NUMERIC_PRECISION_LOSS") from error
         return converted
+    def precise_int(raw: str) -> int:
+        # Python limits decimal int conversion to protect against CPU abuse.
+        # Reject oversized literals with a stable domain error rather than
+        # exposing interpreter-specific ValueError from json.loads.
+        if len(raw.lstrip("-")) > 4096:
+            raise ValueError("DATASET_INTEGER_BUDGET_EXCEEDED")
+        return int(raw)
     lines = source.split("\n")
     if lines[-1] == "":
         lines.pop()
@@ -51,7 +58,7 @@ def parse_dataset(source: str, expected_sha: str, expected_count: int) -> list[d
         try:
             case = json.loads(
                 line, object_pairs_hook=unique, parse_constant=constant,
-                parse_float=precise_float,
+                parse_float=precise_float, parse_int=precise_int,
             )
         except (json.JSONDecodeError, RecursionError) as error:
             raise ValueError("DATASET_JSONL_INVALID") from error
