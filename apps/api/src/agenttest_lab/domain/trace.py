@@ -57,7 +57,7 @@ _EMBEDDED_SECRET_ASSIGNMENT = re.compile(
 )
 _URL_USERINFO = re.compile(
     r"(?i)\b((?:https?|postgres(?:ql)?|redis(?:s)?|amqps?|mongodb(?:\+srv)?|mysql)://)"
-    r"[^\s/@:?]+:[^\s/@]+@"
+    r"[^\s/@]+@"
 )
 _BASIC_AUTH = re.compile(r"(?i)\bBasic[ \t]+[A-Za-z0-9+/]+={0,2}(?![A-Za-z0-9+/=])")
 
